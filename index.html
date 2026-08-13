@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Verdant Hollow</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%230a0c10'/%3E%3Cpath d='M4 12 L11 4 M2 10 L6 14' stroke='%23c9d2e0' stroke-width='2'/%3E%3Cpath d='M2 11 L5 14' stroke='%23e8c247' stroke-width='2'/%3E%3C/svg%3E"
+    />
+    <style>
+      :root {
+        color-scheme: dark;
+        --ink: #e8e2cf;
+      }
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        background: #0a0c10;
+        color: var(--ink);
+        font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+        overflow: hidden;
+        touch-action: none;
+        overscroll-behavior: none;
+      }
+      #stage {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        background:
+          radial-gradient(120% 90% at 50% 0%, #171d28 0%, #0a0c10 70%);
+      }
+      #frame {
+        position: relative;
+        line-height: 0;
+        box-shadow: 0 0 0 2px #2b3242, 0 24px 60px -12px rgba(0, 0, 0, 0.9);
+      }
+      canvas {
+        display: block;
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+      }
+      #game {
+        position: relative;
+        image-rendering: pixelated;
+        image-rendering: crisp-edges;
+      }
+      /* The UI canvas is the topmost layer, so it is what receives pointer
+         events for the whole game — menus, drag and drop, and shop clicks. */
+      #ui {
+        pointer-events: auto;
+        cursor: default;
+      }
+      #boot {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-content: center;
+        justify-items: center;
+        gap: 14px;
+        background: #0a0c10;
+        z-index: 10;
+        text-align: center;
+        padding: 24px;
+      }
+      #boot h1 {
+        margin: 0;
+        font-size: clamp(28px, 6vw, 52px);
+        letter-spacing: 0.16em;
+        color: #f0d67a;
+        text-shadow: 0 3px 0 #7a5a18;
+      }
+      #boot p { margin: 0; opacity: 0.62; font-size: 13px; max-width: 46ch; line-height: 1.7; }
+      #boot button {
+        margin-top: 8px;
+        font: inherit;
+        font-size: 15px;
+        letter-spacing: 0.12em;
+        padding: 12px 30px;
+        color: #0a0c10;
+        background: #f0d67a;
+        border: 0;
+        cursor: pointer;
+      }
+      #boot button:hover { background: #fff0ad; }
+      #boot.hidden { display: none; }
+    </style>
+  </head>
+  <body>
+    <div id="stage">
+      <div id="frame">
+        <canvas id="game"></canvas>
+        <canvas id="ui"></canvas>
+      </div>
+    </div>
+    <div id="boot">
+      <h1>VERDANT HOLLOW</h1>
+      <p>
+        Move with WASD or the arrow keys. J swings your blade, K uses the equipped item,
+        L raises your shield. Tab opens the satchel. Escape pauses.
+      </p>
+      <button id="boot-start" type="button">ENTER THE HOLLOW</button>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
