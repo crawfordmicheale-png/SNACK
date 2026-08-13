@@ -1,0 +1,20 @@
+{
+  "name": "snack",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Verdant Hollow - a top-down action RPG in the spirit of A Link to the Past",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "verify": "node scripts/verify.mjs",
+    "smoke": "node scripts/smoke.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.49.0",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.10"
+  }
+}

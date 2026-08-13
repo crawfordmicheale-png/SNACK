@@ -1,0 +1,450 @@
+/**
+ * Enemy roster. Each type is a small state machine — the variety comes from
+ * how they approach, when they commit, and what punishes a careless swing.
+ */
+import type { AnimSet } from '../../art/actors';
+import { PAL } from '../../art/palette';
+import { DIR_VECTORS, dist, rectsOverlap, vectorToDir, type Dir } from '../../engine/math';
+import { rng } from '../../engine/rng';
+import { Entity, moveWithCollision, type Gfx } from '../entity';
+import type { Scene } from '../scene';
+import { EnemyShot } from './projectiles';
+
+export type EnemyKind = 'slime' | 'octorok' | 'keese' | 'stalfos' | 'thornling';
+
+export interface EnemyStats {
+  hp: number;
+  /** Contact damage in half-hearts. */
+  touch: number;
+  speed: number;
+  /** Half-hearts of damage ignored per hit. */
+  armor?: number;
+}
+
+export const ENEMY_STATS: Record<EnemyKind, EnemyStats> = {
+  slime: { hp: 3, touch: 1, speed: 26 },
+  keese: { hp: 2, touch: 1, speed: 62 },
+  octorok: { hp: 4, touch: 1, speed: 30 },
+  thornling: { hp: 6, touch: 2, speed: 0 },
+  stalfos: { hp: 9, touch: 2, speed: 42, armor: 1 },
+};
+
+export abstract class Enemy extends Entity {
+  readonly kind: EnemyKind;
+  /** Seconds of stun remaining; stunned enemies do not act. */
+  stun = 0;
+  /** Set by the scene so drops and clear-checks know where it came from. */
+  spawnIndex = -1;
+  protected stats: EnemyStats;
+  /** Contact damage cooldown so touching does not shred the player. */
+  protected touchCooldown = 0;
+
+  constructor(kind: EnemyKind, x: number, y: number) {
+    super();
+    this.kind = kind;
+    this.stats = ENEMY_STATS[kind];
+    this.x = x;
+    this.y = y;
+    this.team = 'enemy';
+    this.hp = this.stats.hp;
+    this.maxHp = this.stats.hp;
+    this.solidBody = true;
+  }
+
+  /**
+   * Enemies are struck anywhere on their sprite, which stands taller than the
+   * footprint used for walking. Without this, tall enemies could be walked
+   * into but not hit.
+   */
+  override hurtbox() {
+    const box = this.hitbox();
+    return { x: box.x - 1, y: box.y - 6, w: box.w + 2, h: box.h + 6 };
+  }
+
+  /** Half-hearts subtracted from each incoming hit. Overridable per enemy. */
+  protected armorValue(): number {
+    return this.stats.armor ?? 0;
+  }
+
+  /** Scales damage after armour — used for exposed-state weak points. */
+  protected damageMultiplier(): number {
+    return 1;
+  }
+
+  /** Armour subtracts from every incoming hit but never nullifies it. */
+  override takeDamage(amount: number, scene: Scene, fromX?: number, fromY?: number, force = 120): boolean {
+    const reduced = Math.max(1, amount - this.armorValue()) * this.damageMultiplier();
+    return super.takeDamage(Math.round(reduced), scene, fromX, fromY, force);
+  }
+
+  protected override onDeath(scene: Scene): void {
+    scene.onEnemyKilled(this);
+  }
+
+  /** Applies knockback movement and contact damage; call from `update`. */
+  protected baseUpdate(dt: number, scene: Scene): void {
+    this.tickCommon(dt);
+    if (this.stun > 0) this.stun -= dt;
+    if (this.touchCooldown > 0) this.touchCooldown -= dt;
+
+    if (this.kx !== 0 || this.ky !== 0) {
+      moveWithCollision(this, this.kx * dt, this.ky * dt, scene);
+    }
+
+    const player = scene.player;
+    if (!player.dead && this.touchCooldown <= 0 && rectsOverlap(this.hurtbox(), player.hurtbox())) {
+      if (player.takeDamage(this.stats.touch, scene, this.x, this.y, 190)) {
+        this.touchCooldown = 0.5;
+      }
+    }
+  }
+
+  /** Straight-line chase with a light wander so groups do not stack up. */
+  protected chase(dt: number, scene: Scene, speed: number, jitter = 0): void {
+    const player = scene.player;
+    let dx = player.x - this.x;
+    let dy = player.y - this.y;
+    const len = Math.hypot(dx, dy) || 1;
+    dx /= len;
+    dy /= len;
+    if (jitter > 0) {
+      dx += rng.range(-jitter, jitter);
+      dy += rng.range(-jitter, jitter);
+    }
+    this.facing = vectorToDir(dx, dy, this.facing);
+    moveWithCollision(this, dx * speed * dt, dy * speed * dt, scene);
+  }
+
+  protected drawAnim(g: Gfx, anim: AnimSet, fps: number): void {
+    const frames = anim.frames[this.facing] ?? anim.frames.down;
+    const frame = frames[Math.floor(this.animTime * fps) % frames.length];
+    this.drawShadow(g, anim.w - 2);
+    this.drawFrame(g, frame, anim.ox, anim.oy);
+    if (this.stun > 0) this.drawStunStars(g);
+  }
+
+  private drawStunStars(g: Gfx): void {
+    const frames = g.art.fx.sparkle;
+    for (let i = 0; i < 2; i++) {
+      const a = g.time * 6 + i * Math.PI;
+      const x = this.x - g.camX + Math.cos(a) * 7;
+      const y = this.y - g.camY - 22 + Math.sin(a) * 2;
+      g.ctx.drawImage(frames[Math.floor(g.time * 14 + i) % frames.length], Math.round(x - 4), Math.round(y - 4));
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+
+/** Hops toward the player in bursts, harmless between hops. */
+export class Slime extends Enemy {
+  private hopTimer = rng.range(0.2, 1.2);
+  private hopping = false;
+  private hopDir = { x: 0, y: 1 };
+
+  constructor(x: number, y: number) {
+    super('slime', x, y);
+    this.w = 12;
+    this.h = 9;
+  }
+
+  override update(dt: number, scene: Scene): void {
+    this.baseUpdate(dt, scene);
+    if (this.stun > 0) return;
+
+    this.hopTimer -= dt;
+    if (this.hopping) {
+      // Arc through the air; the sprite squashes on landing.
+      this.z = Math.max(0, Math.sin((1 - Math.max(0, this.hopTimer) / 0.42) * Math.PI) * 7);
+      moveWithCollision(this, this.hopDir.x * this.stats.speed * 2.4 * dt, this.hopDir.y * this.stats.speed * 2.4 * dt, scene);
+      if (this.hopTimer <= 0) {
+        this.hopping = false;
+        this.z = 0;
+        this.hopTimer = rng.range(0.5, 1.1);
+        scene.effects.dust(this.x, this.y, 4);
+      }
+    } else if (this.hopTimer <= 0) {
+      const player = scene.player;
+      const dx = player.x - this.x;
+      const dy = player.y - this.y;
+      const len = Math.hypot(dx, dy) || 1;
+      this.hopDir = { x: dx / len, y: dy / len };
+      this.facing = vectorToDir(dx, dy, this.facing);
+      this.hopping = true;
+      this.hopTimer = 0.42;
+    }
+  }
+
+  override draw(g: Gfx): void {
+    this.drawAnim(g, g.art.actors.slime.idle, this.hopping ? 10 : 4);
+  }
+}
+
+// ---------------------------------------------------------------------------
+
+/** Shuffles into line with the player, stops, and spits a rock. */
+export class Octorok extends Enemy {
+  private state: 'walk' | 'aim' | 'recover' = 'walk';
+  private timer = rng.range(0.6, 1.6);
+  private moveDir: Dir = 'down';
+
+  constructor(x: number, y: number) {
+    super('octorok', x, y);
+    this.w = 12;
+    this.h = 10;
+  }
+
+  override update(dt: number, scene: Scene): void {
+    this.baseUpdate(dt, scene);
+    if (this.stun > 0) return;
+    this.timer -= dt;
+
+    switch (this.state) {
+      case 'walk': {
+        const v = DIR_VECTORS[this.moveDir];
+        const res = moveWithCollision(this, v.x * this.stats.speed * dt, v.y * this.stats.speed * dt, scene);
+        this.facing = this.moveDir;
+        if (res.hitX || res.hitY || this.timer <= 0) {
+          this.moveDir = rng.pick(['up', 'down', 'left', 'right'] as Dir[]);
+          this.timer = rng.range(0.7, 1.8);
+        }
+        // Fire when roughly aligned with the player and within range.
+        const player = scene.player;
+        const dx = player.x - this.x;
+        const dy = player.y - this.y;
+        const aligned = Math.abs(dx) < 14 || Math.abs(dy) < 14;
+        if (aligned && dist(this.x, this.y, player.x, player.y) < 150 && rng.chance(dt * 2.2)) {
+          this.facing = vectorToDir(Math.abs(dx) < 14 ? 0 : dx, Math.abs(dx) < 14 ? dy : 0, this.facing);
+          this.state = 'aim';
+          this.timer = 0.32;
+        }
+        break;
+      }
+      case 'aim':
+        if (this.timer <= 0) {
+          const v = DIR_VECTORS[this.facing];
+          scene.spawn(new EnemyShot(this.x, this.y - 8, v.x, v.y, 1, 'rock', 132));
+          scene.audio.play('swing');
+          this.state = 'recover';
+          this.timer = 0.5;
+        }
+        break;
+      case 'recover':
+        if (this.timer <= 0) {
+          this.state = 'walk';
+          this.timer = rng.range(0.6, 1.4);
+        }
+        break;
+    }
+  }
+
+  override draw(g: Gfx): void {
+    this.drawAnim(g, g.art.actors.octorok.idle, this.state === 'walk' ? 5 : 2);
+  }
+}
+
+// ---------------------------------------------------------------------------
+
+/** Erratic flyer: rests until the player is near, then swoops in bursts. */
+export class Keese extends Enemy {
+  private restTimer = rng.range(0.4, 1.6);
+  private flying = false;
+  private dirX = 0;
+  private dirY = 0;
+
+  constructor(x: number, y: number) {
+    super('keese', x, y);
+    this.w = 10;
+    this.h = 8;
+    this.ghost = false;
+    this.z = 10;
+  }
+
+  override update(dt: number, scene: Scene): void {
+    this.baseUpdate(dt, scene);
+    if (this.stun > 0) return;
+
+    this.z = 10 + Math.sin(this.animTime * 7) * 2;
+    this.restTimer -= dt;
+
+    if (!this.flying) {
+      if (this.restTimer <= 0 || dist(this.x, this.y, scene.player.x, scene.player.y) < 80) {
+        this.flying = true;
+        this.restTimer = rng.range(0.9, 1.8);
+        const dx = scene.player.x - this.x;
+        const dy = scene.player.y - this.y;
+        const len = Math.hypot(dx, dy) || 1;
+        this.dirX = dx / len + rng.range(-0.5, 0.5);
+        this.dirY = dy / len + rng.range(-0.5, 0.5);
+      }
+      return;
+    }
+
+    // Weave while closing, and bounce off walls instead of stalling on them.
+    const wobble = Math.sin(this.animTime * 11) * 0.5;
+    const res = moveWithCollision(
+      this,
+      (this.dirX + wobble * this.dirY) * this.stats.speed * dt,
+      (this.dirY - wobble * this.dirX) * this.stats.speed * dt,
+      scene,
+    );
+    if (res.hitX) this.dirX *= -1;
+    if (res.hitY) this.dirY *= -1;
+
+    if (this.restTimer <= 0) {
+      this.flying = false;
+      this.restTimer = rng.range(0.3, 0.9);
+    }
+  }
+
+  override draw(g: Gfx): void {
+    this.drawAnim(g, g.art.actors.keese.idle, this.flying ? 16 : 6);
+  }
+}
+
+// ---------------------------------------------------------------------------
+
+/**
+ * Armoured skeleton. Its shield faces the direction it is moving, and hits
+ * from that side are deflected — you have to get around it.
+ */
+export class Stalfos extends Enemy {
+  private state: 'patrol' | 'charge' | 'rest' = 'patrol';
+  private timer = rng.range(0.8, 1.8);
+  private moveDir: Dir = 'down';
+
+  constructor(x: number, y: number) {
+    super('stalfos', x, y);
+    this.w = 12;
+    this.h = 11;
+  }
+
+  /** True if an incoming hit lands on the shielded face. */
+  blocksFrom(fromX: number, fromY: number): boolean {
+    const v = DIR_VECTORS[this.facing];
+    const dx = fromX - this.x;
+    const dy = fromY - this.y;
+    const len = Math.hypot(dx, dy) || 1;
+    return (dx / len) * v.x + (dy / len) * v.y > 0.45;
+  }
+
+  override update(dt: number, scene: Scene): void {
+    this.baseUpdate(dt, scene);
+    if (this.stun > 0) return;
+    this.timer -= dt;
+
+    const player = scene.player;
+    const range = dist(this.x, this.y, player.x, player.y);
+
+    switch (this.state) {
+      case 'patrol': {
+        const v = DIR_VECTORS[this.moveDir];
+        const res = moveWithCollision(this, v.x * this.stats.speed * 0.6 * dt, v.y * this.stats.speed * 0.6 * dt, scene);
+        this.facing = this.moveDir;
+        if (res.hitX || res.hitY || this.timer <= 0) {
+          this.moveDir = rng.pick(['up', 'down', 'left', 'right'] as Dir[]);
+          this.timer = rng.range(0.6, 1.5);
+        }
+        if (range < 90) {
+          this.state = 'charge';
+          this.timer = 1.3;
+        }
+        break;
+      }
+      case 'charge':
+        this.chase(dt, scene, this.stats.speed, 0.08);
+        if (this.timer <= 0 || range > 130) {
+          this.state = 'rest';
+          this.timer = 0.55;
+        }
+        break;
+      case 'rest':
+        if (this.timer <= 0) {
+          this.state = range < 100 ? 'charge' : 'patrol';
+          this.timer = rng.range(0.8, 1.6);
+        }
+        break;
+    }
+  }
+
+  override draw(g: Gfx): void {
+    this.drawAnim(g, g.art.actors.stalfos.idle, this.state === 'charge' ? 8 : 4);
+  }
+}
+
+// ---------------------------------------------------------------------------
+
+/** Rooted spitter. Cannot move, so it controls space instead. */
+export class Thornling extends Enemy {
+  private cooldown = rng.range(0.8, 2);
+  private open = false;
+
+  constructor(x: number, y: number) {
+    super('thornling', x, y);
+    this.w = 12;
+    this.h = 10;
+    this.solidBody = true;
+  }
+
+  override update(dt: number, scene: Scene): void {
+    this.baseUpdate(dt, scene);
+    // Rooted: cancel any knockback translation.
+    this.kx = 0;
+    this.ky = 0;
+    if (this.stun > 0) return;
+
+    this.cooldown -= dt;
+    const player = scene.player;
+    const range = dist(this.x, this.y, player.x, player.y);
+    this.open = this.cooldown < 0.35 && range < 160;
+
+    if (this.cooldown <= 0) {
+      if (range < 160) {
+        // Three-seed fan.
+        const base = Math.atan2(player.y - this.y, player.x - this.x);
+        for (const spread of [-0.32, 0, 0.32]) {
+          const a = base + spread;
+          scene.spawn(new EnemyShot(this.x, this.y - 10, Math.cos(a), Math.sin(a), 1, 'seed', 108));
+        }
+        scene.audio.play('swing');
+        this.cooldown = rng.range(1.7, 2.6);
+      } else {
+        this.cooldown = 0.6;
+      }
+    }
+  }
+
+  override draw(g: Gfx): void {
+    const anim = g.art.actors.thornling.idle;
+    const frames = anim.frames.down;
+    const frame = frames[this.open ? 0 : 1];
+    this.drawShadow(g, 13);
+    this.drawFrame(g, frame, anim.ox, anim.oy);
+  }
+}
+
+// ---------------------------------------------------------------------------
+
+export function createEnemy(kind: EnemyKind, x: number, y: number): Enemy {
+  switch (kind) {
+    case 'slime':
+      return new Slime(x, y);
+    case 'octorok':
+      return new Octorok(x, y);
+    case 'keese':
+      return new Keese(x, y);
+    case 'stalfos':
+      return new Stalfos(x, y);
+    case 'thornling':
+      return new Thornling(x, y);
+  }
+}
+
+/** Particle colour used when an enemy dies. */
+export const DEATH_COLOR: Record<EnemyKind, string> = {
+  slime: PAL.slime,
+  octorok: PAL.blood,
+  keese: PAL.bat,
+  stalfos: PAL.plaster,
+  thornling: PAL.plant,
+};
