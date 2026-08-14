@@ -6,7 +6,11 @@ keys and a boss — wrapped around a modern inventory and a persistent mastery s
 
 No game engine, no runtime dependencies, and no art assets: every tile, sprite,
 icon and sound is generated procedurally in the browser at boot. The production
-bundle is a single ~57 KB gzipped JavaScript file.
+bundle is a single ~60 KB gzipped JavaScript file.
+
+**[Play it](https://crawfordmicheale-png.github.io/SNACK/)** — deployed from
+`main` on every push, but only once the full test suite has passed. It works on
+a phone; turn it sideways.
 
 ```bash
 npm install
@@ -34,6 +38,25 @@ npm run verify   # build, serve, and run the browser smoke test
 
 The satchel is also fully mouse-driven: drag items between slots, onto equipment,
 or onto the quick bar.
+
+### On a phone or tablet
+
+On-screen controls appear automatically on touch devices — a floating thumbstick
+on the left, and sword / item / shield / interact buttons on the right, with a
+BAG button for the satchel.
+
+The stick is analog and materialises wherever your thumb lands rather than
+sitting in one fixed spot. Everything is multi-touch, so you can move and swing
+at the same time.
+
+Where the controls sit depends on orientation: in **landscape** they occupy the
+letterboxing either side of the picture, so nothing overlaps the game — this is
+the better way to play, and the game says so once in portrait. In **portrait**
+the picture is fitted above the controls instead.
+
+Menus are driven by direct touch: tap a tab, tap an item to equip it, drag items
+between slots, tap CLOSE to leave. Tapping anywhere advances dialogue, and the
+quick slots along the bottom of the HUD are tap targets in their own right.
 
 ## The game
 
@@ -95,7 +118,7 @@ autosaves every 25 seconds, on room rest, and on unload.
 
 ```
 src/
-  engine/     game loop, input, RNG, audio synthesis, dual-canvas presentation
+  engine/     game loop, input, RNG, audio synthesis, presentation, touch controls
   art/        procedural palette, tileset, actor sprites, item icons, effects
   world/      tile definitions, ASCII maps, global tile grid, room streaming
   game/       entities, player controller, enemies, boss, items, mastery, scene
@@ -120,6 +143,15 @@ All sound is synthesised from oscillators and noise buffers at call time
 village, dungeon and boss — are scheduled note-by-note against the AudioContext
 clock, so music timing never depends on the render loop.
 
+## Deployment
+
+`.github/workflows/pages.yml` publishes `dist/` to GitHub Pages on every push to
+`main`. The deploy is gated on `npm run verify`, so a build that fails to typecheck
+or a game that stops being playable never reaches the public URL.
+
+The Vite build uses a relative `base`, so the bundle works unmodified from the
+`/SNACK/` subpath Pages serves it under.
+
 ## Testing
 
 `scripts/smoke.mjs` drives the built game in headless Chromium: it starts a new
@@ -128,6 +160,12 @@ back its live position, hunts and kills an enemy, and descends into the dungeon.
 It fails on any console error, any map-validation warning, or any missed
 behavioural assertion, and writes screenshots to `scripts/shots/`.
 
+`scripts/touch-smoke.mjs` does the same for mobile, in an emulated phone in both
+orientations, using **only** synthetic touches on the on-screen controls — no
+keyboard events at all. It asserts that the thumbstick moves the hero, the sword
+button swings, BAG opens the satchel and CLOSE shuts it, and that the picture
+never collapses or slides under the control band.
+
 It also runs a **world reachability audit** ([`src/dev/audit.ts`](src/dev/audit.ts)):
 a flood fill across every map, walking through doors, stairs, bombable walls and
 locked doors, which asserts that every room, chest, NPC and transition can
@@ -135,12 +173,15 @@ actually be reached. Hand-authored ASCII maps are easy to get subtly wrong — t
 caught a walled-in dungeon stairway and a cave exit that landed inside a cliff.
 
 ```bash
-npm run verify
+npm run verify        # build, then both suites
+npm run smoke         # desktop only
+npm run smoke:touch   # mobile only
 ```
 
 ## Known limitations
 
 - One save slot, and no way to rebind keys from inside the game.
-- Touch devices are not supported; the game needs a keyboard.
+- In portrait the picture is small — a 20x13 screen is always width-bound on a
+  tall phone. Landscape is the intended way to play on mobile.
 - The dungeon map screen shows chest and boss markers for rooms you have
   visited, but there is no separate collectible dungeon map item in play yet.

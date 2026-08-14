@@ -9,15 +9,19 @@ import { itemDef } from '../game/items/itemdefs';
 import { stackName } from '../game/items/loot';
 import { xpToNext } from '../game/mastery';
 import type { Scene } from '../game/scene';
-import { bar, icon, measure, panel, rect, strokeRect, text, wrapText, type UiCtx } from './draw';
+import { bar, hovered, icon, measure, panel, rect, strokeRect, text, wrapText, type UiCtx } from './draw';
 
 const HEART_SIZE = 11;
 
-export function drawHud(u: UiCtx, scene: Scene): void {
+/**
+ * `interactive` is false while a menu covers the HUD, so a tap meant for the
+ * menu cannot also fall through to a quick slot underneath it.
+ */
+export function drawHud(u: UiCtx, scene: Scene, interactive = true): void {
   drawHearts(u, scene);
   drawMagic(u, scene);
   drawCurrency(u, scene);
-  drawQuickSlots(u, scene);
+  drawQuickSlots(u, scene, interactive);
   drawXpStrip(u, scene);
   drawBossBar(u, scene);
   drawPrompt(u, scene);
@@ -101,16 +105,21 @@ function drawCurrency(u: UiCtx, scene: Scene): void {
   }
 }
 
-function drawQuickSlots(u: UiCtx, scene: Scene): void {
+function drawQuickSlots(u: UiCtx, scene: Scene, interactive: boolean): void {
   const size = 20;
   const gap = 3;
   const total = 4 * size + 3 * gap;
   const x0 = (u.w - total) / 2;
   const y = u.h - size - 5;
+  const tappable = interactive && !scene.dialogue && !scene.shop && !scene.gameOver && !scene.victory;
 
   for (let i = 0; i < 4; i++) {
     const x = x0 + i * (size + gap);
-    panel(u, x, y, size, size, { fill: withAlpha(PAL.uiBackDeep, 0.72) });
+    const hot = hovered(u, x, y, size, size);
+    panel(u, x, y, size, size, { fill: withAlpha(PAL.uiBackDeep, hot && tappable ? 0.9 : 0.72) });
+
+    // Quick slots double as touch targets, so an item is always one tap away.
+    if (tappable && hot && u.mouse?.pressed) scene.player.useQuickSlot(i, scene);
 
     const uid = scene.inventory.quick[i];
     const stack = uid !== null ? scene.inventory.stackByUid(uid) : null;
@@ -279,6 +288,15 @@ function drawShop(u: UiCtx, scene: Scene): void {
     const def = itemDef(offer.defId);
     const affordable = scene.rupees >= offer.price;
 
+    // Tapping a row selects it; tapping the selected row buys it.
+    if (hovered(u, x + 4, rowY - 2, w - 8, rowH - 2) && u.mouse?.pressed) {
+      if (selected) scene.buy(offer);
+      else {
+        shop.cursor = i;
+        scene.audio.play('menu');
+      }
+    }
+
     if (selected) {
       rect(u, x + 4, rowY - 2, w - 8, rowH - 2, withAlpha(PAL.uiPanelLight, 0.9));
       strokeRect(u, x + 4, rowY - 2, w - 8, rowH - 2, PAL.uiAccent, 1);
@@ -295,4 +313,11 @@ function drawShop(u: UiCtx, scene: Scene): void {
   });
 
   text(u, 'ENTER buy    ESC leave', x + w / 2, y + h - 11, { align: 'center', size: 7, color: PAL.uiTextDim });
+
+  // Anywhere outside the panel closes the shop, which is the only way out on
+  // a touch device.
+  if (u.mouse?.pressed && !hovered(u, x, y, w, h)) {
+    scene.shop = null;
+    scene.audio.play('menu');
+  }
 }

@@ -48,10 +48,13 @@ if (!ready) {
   process.exit(1);
 }
 
-console.log('› smoke test');
-const result = run('node', ['scripts/smoke.mjs'], {
-  env: { ...process.env, SMOKE_URL: URL, NO_PROXY: '*', no_proxy: '*' },
-});
+const env = { ...process.env, SMOKE_URL: URL, NO_PROXY: '*', no_proxy: '*' };
+
+console.log('› smoke test (desktop)');
+const desktop = run('node', ['scripts/smoke.mjs'], { env });
+
+console.log('› smoke test (touch)');
+const touch = run('node', ['scripts/touch-smoke.mjs'], { env });
 
 shutdown();
-process.exit(result.status ?? 1);
+process.exit(desktop.status || touch.status || 0);
