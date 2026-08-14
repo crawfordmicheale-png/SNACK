@@ -6,7 +6,7 @@
  *   node scripts/smoke.mjs [--headed]
  */
 import { chromium } from 'playwright';
-import { mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
@@ -16,8 +16,17 @@ mkdirSync(shots, { recursive: true });
 
 const URL = process.env.SMOKE_URL ?? 'http://localhost:4173/';
 
+/**
+ * Prefer an explicitly configured browser, then a preinstalled one, and
+ * otherwise let Playwright use the copy it manages itself — which is what
+ * happens in CI after `playwright install chromium`.
+ */
+const PREINSTALLED = '/opt/pw-browsers/chromium';
+const executablePath =
+  process.env.PLAYWRIGHT_CHROMIUM ?? (existsSync(PREINSTALLED) ? PREINSTALLED : undefined);
+
 const browser = await chromium.launch({
-  executablePath: process.env.PLAYWRIGHT_CHROMIUM ?? '/opt/pw-browsers/chromium',
+  ...(executablePath ? { executablePath } : {}),
   headless: !process.argv.includes('--headed'),
   args: ['--no-sandbox', '--autoplay-policy=no-user-gesture-required'],
 });
