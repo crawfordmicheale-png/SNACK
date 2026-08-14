@@ -6,7 +6,11 @@ keys and a boss — wrapped around a modern inventory and a persistent mastery s
 
 No game engine, no runtime dependencies, and no art assets: every tile, sprite,
 icon and sound is generated procedurally in the browser at boot. The production
-bundle is a single ~57 KB gzipped JavaScript file.
+bundle is a single ~60 KB gzipped JavaScript file.
+
+**[Play it](https://crawfordmicheale-png.github.io/SNACK/)** — deployed from
+`main` on every push, but only once the full test suite has passed. It works on
+a phone; turn it sideways.
 
 ```bash
 npm install
@@ -138,6 +142,15 @@ All sound is synthesised from oscillators and noise buffers at call time
 ([`engine/audio.ts`](src/engine/audio.ts)). Four looping songs — overworld,
 village, dungeon and boss — are scheduled note-by-note against the AudioContext
 clock, so music timing never depends on the render loop.
+
+## Deployment
+
+`.github/workflows/pages.yml` publishes `dist/` to GitHub Pages on every push to
+`main`. The deploy is gated on `npm run verify`, so a build that fails to typecheck
+or a game that stops being playable never reaches the public URL.
+
+The Vite build uses a relative `base`, so the bundle works unmodified from the
+`/SNACK/` subpath Pages serves it under.
 
 ## Testing
 

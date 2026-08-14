@@ -1,0 +1,79 @@
+name: Deploy to Pages
+
+on:
+  push:
+    branches: [main]
+  # Lets you republish the current main without pushing anything.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never let two deploys race; queue them instead of cancelling, so the last
+# push to main is always the one that ends up live.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build and test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      # Publishing a broken game to a public URL is worse than spending a
+      # minute proving it runs, so the full suite gates the deploy. `verify`
+      # builds `dist/` and then plays it, on desktop and on an emulated phone.
+      - name: Build and smoke test
+        run: npm run verify
+
+      # `enablement` switches the Pages source to GitHub Actions if the
+      # repository is still set to publish from a branch.
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+      - name: Upload smoke screenshots
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: failed-deploy-screenshots
+          path: scripts/shots/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  deploy:
+    name: Deploy
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Publish
+        id: deployment
+        uses: actions/deploy-pages@v4
