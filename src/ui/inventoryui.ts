@@ -46,10 +46,11 @@ const GRID_RIGHT = GRID_X + BACKPACK_COLS * CELL;
 
 const QUICK_Y = 330;
 const CONTROLS_Y = 380;
-const STATS_Y = 314;
-const STATS_H = 70;
+const STATS_Y = 310;
+const STATS_H = 76;
+const STATS_ROW_H = 10;
 /** Hint line, tucked under the stats panel in the left column. */
-const HINT_Y = 388;
+const HINT_Y = 390;
 
 type FilterId = 'all' | ItemCategory;
 
@@ -317,7 +318,7 @@ function drawStatsPanel(m: UiCtx, scene: Scene): void {
     ['LUCK', `${stats.luck ?? 0}%`],
   ];
   rows.forEach(([label, value], i) => {
-    const ry = y + 22 + i * 11;
+    const ry = y + 19 + i * STATS_ROW_H;
     text(m, label, x + 8, ry, { size: 10, color: PAL.uiTextDim });
     text(m, value, x + w - 8, ry, { align: 'right', size: 10, weight: 700, color: PAL.uiText });
   });
@@ -444,8 +445,8 @@ function drawControls(m: UiCtx, scene: Scene, state: InventoryUiState): void {
     sx += sortWidths[i] + 4;
   });
 
-  text(m, 'ENTER equip · 1-4 bind', EQUIP_X, HINT_Y, { size: 9, color: PAL.uiTextDim });
-  text(m, 'drag items with the mouse', EQUIP_X, HINT_Y + 11, { size: 9, color: PAL.uiTextDim });
+  // Worded for both a keyboard and a thumb.
+  text(m, 'tap or ENTER to equip · drag to move', EQUIP_X, HINT_Y, { size: 9, color: PAL.uiTextDim });
 }
 
 // ---------------------------------------------------------------------------

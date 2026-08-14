@@ -24,6 +24,13 @@ export class Screen {
   /** CSS pixel size of the presented frame. */
   cssW = VIEW_W * 3;
   cssH = VIEW_H * 3;
+  /**
+   * Vertical space kept clear below the picture for on-screen controls, and
+   * whether to allow fractional scaling. Touch devices trade pixel-perfect
+   * upscaling for filling the screen; desktops keep integer scale.
+   */
+  reservedBottom = 0;
+  allowFractionalScale = false;
 
   constructor(
     gameCanvas: HTMLCanvasElement,
@@ -44,18 +51,22 @@ export class Screen {
   }
 
   resize = (): void => {
-    const pad = 16;
+    const pad = this.reservedBottom > 0 ? 8 : 16;
     const availW = Math.max(240, window.innerWidth - pad * 2);
-    const availH = Math.max(180, window.innerHeight - pad * 2);
-    // Prefer a whole-number scale; fall back to a fractional one on tiny screens.
+    const availH = Math.max(140, window.innerHeight - this.reservedBottom - pad * 2);
+    // Prefer a whole-number scale; fall back to a fractional one on tiny
+    // screens, and on touch layouts where filling the display matters more.
     let scale = Math.min(availW / VIEW_W, availH / VIEW_H);
-    scale = scale >= 1 ? Math.floor(scale) : scale;
+    if (scale >= 1 && !this.allowFractionalScale) scale = Math.floor(scale);
     this.scale = scale;
     this.cssW = Math.round(VIEW_W * scale);
     this.cssH = Math.round(VIEW_H * scale);
 
     this.frame.style.width = `${this.cssW}px`;
     this.frame.style.height = `${this.cssH}px`;
+    // Centring happens in the space above the reserved band.
+    const stage = this.frame.parentElement;
+    if (stage) stage.style.paddingBottom = `${this.reservedBottom}px`;
 
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     this.uiCanvas.width = Math.round(this.cssW * dpr);

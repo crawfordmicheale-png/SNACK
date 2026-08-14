@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "verify": "node scripts/verify.mjs",
-    "smoke": "node scripts/smoke.mjs"
+    "smoke": "node scripts/smoke.mjs",
+    "smoke:touch": "node scripts/touch-smoke.mjs"
   },
   "devDependencies": {
     "playwright": "^1.49.0",

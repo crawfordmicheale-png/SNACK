@@ -10,6 +10,8 @@ import { audio } from './engine/audio';
 import { Input } from './engine/input';
 import { Loop } from './engine/loop';
 import { Screen, VIEW_H, VIEW_W } from './engine/screen';
+import { TouchControls } from './engine/touch';
+import { itemDef } from './game/items/itemdefs';
 import { Scene } from './game/scene';
 import { hasSave, loadGame, saveGame } from './save/save';
 import type { UiCtx } from './ui/draw';
@@ -21,6 +23,7 @@ import { drawGameOver, drawSaveFlash, drawVictory } from './ui/screens';
 const gameCanvas = document.getElementById('game') as HTMLCanvasElement;
 const uiCanvas = document.getElementById('ui') as HTMLCanvasElement;
 const frame = document.getElementById('frame') as HTMLElement;
+const touchCanvas = document.getElementById('touch') as HTMLCanvasElement;
 const boot = document.getElementById('boot') as HTMLElement;
 const startButton = document.getElementById('boot-start') as HTMLButtonElement;
 
@@ -29,6 +32,18 @@ const input = new Input(uiCanvas);
 const art = buildArt();
 const scene = new Scene(input, art);
 const menu = new Menu();
+const touch = new TouchControls(touchCanvas, input, art);
+
+// The control overlay reserves space beneath the picture, so a layout change
+// has to re-fit the presentation.
+touch.onLayoutChange = () => {
+  screen.reservedBottom = touch.reservedHeight;
+  screen.allowFractionalScale = touch.enabled;
+  screen.resize();
+};
+touch.onClose = () => {
+  if (menu.open) menu.close(scene);
+};
 
 /** Autosave cadence, in seconds of play. */
 const AUTOSAVE_INTERVAL = 25;
@@ -65,6 +80,23 @@ function uiContext(): UiCtx {
   };
 }
 
+/** Keeps the control overlay in step with what the player is looking at. */
+function syncTouchMode(): void {
+  const previous = touch.mode;
+  if (scene.gameOver || scene.victory) touch.mode = 'overlay';
+  else if (menu.open) touch.mode = 'menu';
+  else if (scene.dialogue || scene.shop) touch.mode = 'dialogue';
+  else touch.mode = 'play';
+
+  if (touch.mode !== previous) touch.releaseAll();
+  menu.touchMode = touch.enabled;
+
+  touch.showDash = scene.progression.has('dash');
+  const quickUid = scene.inventory.quick[0];
+  const quick = quickUid !== null ? scene.inventory.stackByUid(quickUid) : null;
+  touch.itemIcon = quick ? itemDef(quick.defId).icon : null;
+}
+
 function update(dt: number): void {
   input.beginFrame(dt);
 
@@ -72,6 +104,9 @@ function update(dt: number): void {
     input.endFrame();
     return;
   }
+
+  syncTouchMode();
+  touch.tick(dt);
 
   if (scene.gameOver) {
     overlayElapsed += dt;
@@ -125,22 +160,25 @@ function render(): void {
   const u = uiContext();
 
   if (!started) {
+    touch.draw();
     input.endRender();
     return;
   }
 
   if (scene.gameOver) {
     drawGameOver(u, scene, overlayElapsed);
+    touch.draw();
     input.endRender();
     return;
   }
   if (scene.victory) {
     drawVictory(u, scene, overlayElapsed);
+    touch.draw();
     input.endRender();
     return;
   }
 
-  drawHud(u, scene);
+  drawHud(u, scene, !menu.open);
   menu.draw(u, scene);
   if (saveFlash > 0) drawSaveFlash(u, saveFlash);
 
@@ -148,6 +186,7 @@ function render(): void {
     text(u, 'muted (press N)', 5, VIEW_H - 20, { size: 7, color: PAL.uiTextDim });
   }
 
+  touch.draw();
   input.endRender();
 }
 
@@ -161,6 +200,10 @@ function start(loadExisting: boolean): void {
   }
   started = true;
   boot.classList.add('hidden');
+  // Fit the picture now that we know whether controls are on screen.
+  screen.reservedBottom = touch.reservedHeight;
+  screen.allowFractionalScale = touch.enabled;
+  screen.resize();
   input.flush();
   autosaveTimer = AUTOSAVE_INTERVAL;
 }
@@ -212,6 +255,7 @@ document.addEventListener('visibilitychange', () => {
   busy: scene.isBusy,
   map: scene.world.def.id,
   room: scene.activeRoom?.def.name ?? null,
+  playerAction: scene.player.action,
   playerX: Math.round(scene.player.x),
   playerY: Math.round(scene.player.y),
   hearts: scene.player.hearts,
@@ -231,6 +275,9 @@ document.addEventListener('visibilitychange', () => {
   ),
   fps: Math.round(loop.fps),
 });
+
+/** On-screen control geometry, invoked by the touch smoke test. */
+(window as unknown as { __hollowTouch: () => unknown }).__hollowTouch = () => touch.debugLayout();
 
 /** World reachability audit, invoked by the smoke test. */
 (window as unknown as { __hollowAudit: () => unknown }).__hollowAudit = () =>

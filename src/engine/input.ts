@@ -77,6 +77,15 @@ export class Input {
   /** Set while any modal (menu, dialogue) wants raw text-ish navigation. */
   anyKeyPressed = false;
 
+  /**
+   * On-screen controls feed the same buffers the keyboard does, so every
+   * consumer — movement, attack buffering, menus — works unchanged.
+   */
+  private virtualAxis = { x: 0, y: 0 };
+  private virtualHeld = new Set<Action>();
+  /** True once a physical key is used, so touch controls can step aside. */
+  usedKeyboard = false;
+
   constructor(private readonly target: HTMLElement) {
     window.addEventListener('keydown', this.onKeyDown, { passive: false });
     window.addEventListener('keyup', this.onKeyUp);
@@ -94,6 +103,7 @@ export class Input {
     if (!action) return;
     if (e.repeat) return;
     this.anyKeyPressed = true;
+    this.usedKeyboard = true;
     this.held.add(action);
     this.pressedAt.set(action, this.time);
     this.consumed.delete(action);
@@ -107,6 +117,7 @@ export class Input {
   };
 
   private onBlur = () => {
+    this.clearVirtual();
     this.held.clear();
     this.pointerDownRaw = false;
     this.pressLatch = false;
@@ -140,6 +151,38 @@ export class Input {
     return this.held.has(action);
   }
 
+  // -------------------------------------------------------------------------
+  // Virtual (on-screen) input
+  // -------------------------------------------------------------------------
+
+  /** Analog stick vector, already clamped to the unit circle. */
+  setVirtualAxis(x: number, y: number): void {
+    this.virtualAxis.x = x;
+    this.virtualAxis.y = y;
+  }
+
+  /** Presses an action as though its key went down. Idempotent while held. */
+  pressVirtual(action: Action): void {
+    if (this.virtualHeld.has(action)) return;
+    this.virtualHeld.add(action);
+    this.held.add(action);
+    this.pressedAt.set(action, this.time);
+    this.consumed.delete(action);
+  }
+
+  releaseVirtual(action: Action): void {
+    if (!this.virtualHeld.delete(action)) return;
+    this.held.delete(action);
+    this.releasedThisFrame.add(action);
+  }
+
+  /** Drops every virtual input — used when the control layer is hidden. */
+  clearVirtual(): void {
+    for (const action of [...this.virtualHeld]) this.releaseVirtual(action);
+    this.virtualAxis.x = 0;
+    this.virtualAxis.y = 0;
+  }
+
   /**
    * True if the action was pressed within the buffer window and not yet
    * consumed. Consuming clears it so one press fires exactly one response.
@@ -163,8 +206,15 @@ export class Input {
     return this.releasedThisFrame.has(action);
   }
 
-  /** Normalized movement vector from the four direction actions. */
+  /**
+   * Movement vector from the direction keys, or from the on-screen stick when
+   * it is pushed far enough to count. The stick wins, so a resting thumb never
+   * fights the keyboard.
+   */
   moveVector(): { x: number; y: number } {
+    const stick = Math.hypot(this.virtualAxis.x, this.virtualAxis.y);
+    if (stick > 0.18) return { x: this.virtualAxis.x, y: this.virtualAxis.y };
+
     let x = 0;
     let y = 0;
     if (this.isDown('left')) x -= 1;

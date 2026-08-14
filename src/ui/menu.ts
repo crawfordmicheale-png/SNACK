@@ -43,6 +43,8 @@ export function menuSpace(u: UiCtx): UiCtx {
 export class Menu {
   open = false;
   tab: Tab = 'satchel';
+  /** Set by the host; hides keyboard-only hints on touch devices. */
+  touchMode = false;
   readonly inventory = new InventoryUiState();
   readonly mastery = new MasteryUiState();
 
@@ -175,6 +177,8 @@ export class Menu {
       });
     }
 
-    text(m, 'ESC  close', m.w - 28, TAB_Y + 8, { align: 'right', size: 11, color: PAL.uiTextDim });
+    if (!this.touchMode) {
+      text(m, 'ESC  close', m.w - 28, TAB_Y + 8, { align: 'right', size: 11, color: PAL.uiTextDim });
+    }
   }
 }
