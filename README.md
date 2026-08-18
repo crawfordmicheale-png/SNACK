@@ -1,8 +1,8 @@
 # Verdant Hollow
 
 A browser-based top-down action RPG in the spirit of *The Legend of Zelda: A Link to
-the Past* — screen-by-screen exploration, sword-and-shield combat, a dungeon with
-keys and a boss — wrapped around a modern inventory and a persistent mastery system.
+the Past* — screen-by-screen exploration, sword-and-shield combat, two dungeons
+with keys and bosses — wrapped around a modern inventory and a persistent mastery system.
 
 No game engine, no runtime dependencies, and no art assets: every tile, sprite,
 icon and sound is generated procedurally in the browser at boot. The production
@@ -60,12 +60,12 @@ quick slots along the bottom of the HUD are tap targets in their own right.
 
 ## The game
 
-**Verdant Hollow** is a 4×3 screen overworld — village, woods, a river ford,
-cliffs, barrows and a lake — leading north to **The Hollow Root**, a twelve-chamber
-dungeon holding two small keys, a bow, a mini-boss and Thornmaw.
+**Verdant Hollow** is a 4×4 screen overworld — village, woods, a river ford,
+cliffs, barrows, a lake, a mill and a drowned marsh — leading north to
+**The Hollow Root** and south-east to **The Drowned Bell**.
 
-Five interiors (cottages, a smith, a herbalist, a bomb cave) hang off the
-overworld. Every screen is hand-authored as an ASCII grid in
+Five interiors hang off the village, plus a mill cottage and a bomb cave.
+Every screen is hand-authored as an ASCII grid in
 [`src/world/maps/`](src/world/maps); the legend lives in
 [`tiledefs.ts`](src/world/tiledefs.ts).
 
@@ -81,10 +81,17 @@ different question:
   face are deflected, so you have to get around it.
 - **Thornling** is rooted and fires a three-seed fan — it controls space instead
   of chasing.
+- **Wisp** is only solid when it gathers to strike. Swinging at the smear of
+  light does nothing.
+- **Crab** keeps its shell toward you while it sidesteps, then snaps. Hit it
+  after it commits.
 - **The Warden** alternates a plated advance with a telegraphed lunge, and is
   wide open for a beat after it commits.
+- **The Bellwight** vanishes and reappears in a ring of motes; cut it while it
+  hangs, ringing.
 - **Thornmaw** clamps shut except during its vulnerable phase; swinging at the
   shell only rings off it.
+- **Tideheart** is a drowned bell. Wait for the ring, then cut the clapper.
 
 ### Modern inventory
 
@@ -111,8 +118,14 @@ sequential tracks:
 | **Wayfaring** | Move speed, the dash, a loot magnet, luck, and map reveal |
 
 Heart containers also come from Pieces of Heart (four to a container) and from
-the boss. Everything is stored in one versioned `localStorage` slot; the game
-autosaves every 25 seconds, on room rest, and on unload.
+the bosses. Side favours for the herbalist, the smith and Tilly pay in ether,
+a signet ring, and another heart piece. Everything is stored in one versioned
+`localStorage` slot; the game autosaves every 25 seconds, on room rest, and on
+unload.
+
+The Hollow Root holds two small keys, a bow, a dungeon map, a compass, the
+Warden and Thornmaw. The Drowned Bell, under the Sunken Steps, holds the
+lantern, a second map and compass, the Bellwight and Tideheart.
 
 ## Architecture
 
@@ -139,8 +152,8 @@ are deterministic regardless of frame rate.
 ### Audio
 
 All sound is synthesised from oscillators and noise buffers at call time
-([`engine/audio.ts`](src/engine/audio.ts)). Four looping songs — overworld,
-village, dungeon and boss — are scheduled note-by-note against the AudioContext
+([`engine/audio.ts`](src/engine/audio.ts)). Looping songs — overworld,
+village, dungeon, drowned and boss — are scheduled note-by-note against the AudioContext
 clock, so music timing never depends on the render loop.
 
 ## Deployment
@@ -183,5 +196,3 @@ npm run smoke:touch   # mobile only
 - One save slot, and no way to rebind keys from inside the game.
 - In portrait the picture is small — a 20x13 screen is always width-bound on a
   tall phone. Landscape is the intended way to play on mobile.
-- The dungeon map screen shows chest and boss markers for rooms you have
-  visited, but there is no separate collectible dungeon map item in play yet.

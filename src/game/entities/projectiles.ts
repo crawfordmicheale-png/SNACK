@@ -109,10 +109,10 @@ export class Arrow extends Shot {
 
 /** Enemy projectile: octorok rocks and thornling seeds. */
 export class EnemyShot extends Shot {
-  private art: 'rock' | 'seed';
+  private art: 'rock' | 'seed' | 'bolt';
   private spin = 0;
 
-  constructor(x: number, y: number, dx: number, dy: number, damage: number, art: 'rock' | 'seed', speed = 120) {
+  constructor(x: number, y: number, dx: number, dy: number, damage: number, art: 'rock' | 'seed' | 'bolt', speed = 120) {
     super(x, y, dx, dy, speed);
     this.damage = damage;
     this.target = 'player';
@@ -130,7 +130,8 @@ export class EnemyShot extends Shot {
     this.y += this.vy * dt;
 
     if (this.life <= 0 || this.blockedByTiles(scene)) {
-      scene.effects.burst(this.x, this.y - this.z, 5, this.art === 'rock' ? PAL.rock : PAL.plant, { speed: 50, life: 0.25 });
+      const color = this.art === 'rock' ? PAL.rock : this.art === 'bolt' ? PAL.wispLight : PAL.plant;
+      scene.effects.burst(this.x, this.y - this.z, 5, color, { speed: 50, life: 0.25 });
       this.dead = true;
       return;
     }
@@ -150,6 +151,22 @@ export class EnemyShot extends Shot {
   }
 
   override draw(g: Gfx): void {
+    if (this.art === 'bolt') {
+      const x = Math.round(this.x - g.camX);
+      const y = Math.round(this.y - g.camY - this.z);
+      g.ctx.save();
+      g.ctx.globalAlpha = 0.85;
+      g.ctx.fillStyle = PAL.wisp;
+      g.ctx.beginPath();
+      g.ctx.arc(x, y, 4, 0, Math.PI * 2);
+      g.ctx.fill();
+      g.ctx.fillStyle = PAL.wispLight;
+      g.ctx.beginPath();
+      g.ctx.arc(x - 1, y - 1, 2, 0, Math.PI * 2);
+      g.ctx.fill();
+      g.ctx.restore();
+      return;
+    }
     const img = this.art === 'rock' ? g.art.fx.rock : g.art.fx.seed;
     g.ctx.save();
     g.ctx.translate(Math.round(this.x - g.camX), Math.round(this.y - g.camY - this.z));

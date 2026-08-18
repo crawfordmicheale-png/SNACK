@@ -10,7 +10,7 @@ import { Entity, moveWithCollision, type Gfx } from '../entity';
 import type { Scene } from '../scene';
 import { EnemyShot } from './projectiles';
 
-export type EnemyKind = 'slime' | 'octorok' | 'keese' | 'stalfos' | 'thornling';
+export type EnemyKind = 'slime' | 'octorok' | 'keese' | 'stalfos' | 'thornling' | 'wisp' | 'crab';
 
 export interface EnemyStats {
   hp: number;
@@ -27,6 +27,8 @@ export const ENEMY_STATS: Record<EnemyKind, EnemyStats> = {
   octorok: { hp: 4, touch: 1, speed: 30 },
   thornling: { hp: 6, touch: 2, speed: 0 },
   stalfos: { hp: 9, touch: 2, speed: 42, armor: 1 },
+  wisp: { hp: 5, touch: 1, speed: 38 },
+  crab: { hp: 8, touch: 2, speed: 36, armor: 2 },
 };
 
 export abstract class Enemy extends Entity {
@@ -71,7 +73,13 @@ export abstract class Enemy extends Entity {
     return 1;
   }
 
+  /** True if an incoming hit should be deflected. Stalfos and crabs override. */
+  blocksFrom(_fromX: number, _fromY: number): boolean {
+    return false;
+  }
+
   /** Armour subtracts from every incoming hit but never nullifies it. */
+
   override takeDamage(amount: number, scene: Scene, fromX?: number, fromY?: number, force = 120): boolean {
     const reduced = Math.max(1, amount - this.armorValue()) * this.damageMultiplier();
     return super.takeDamage(Math.round(reduced), scene, fromX, fromY, force);
@@ -320,7 +328,7 @@ export class Stalfos extends Enemy {
   }
 
   /** True if an incoming hit lands on the shielded face. */
-  blocksFrom(fromX: number, fromY: number): boolean {
+  override blocksFrom(fromX: number, fromY: number): boolean {
     const v = DIR_VECTORS[this.facing];
     const dx = fromX - this.x;
     const dy = fromY - this.y;
@@ -425,6 +433,192 @@ export class Thornling extends Enemy {
 
 // ---------------------------------------------------------------------------
 
+/**
+ * Will-o'-the-wisp. Spends most of its time as a smear of light you cannot
+ * cut; it only becomes solid when it gathers to strike.
+ */
+export class Wisp extends Enemy {
+  private timer = rng.range(0.4, 1.2);
+  private corporeal = false;
+  private dirX = rng.range(-1, 1);
+  private dirY = rng.range(-1, 1);
+
+  constructor(x: number, y: number) {
+    super('wisp', x, y);
+    this.w = 10;
+    this.h = 10;
+    this.z = 12;
+    this.solidBody = false;
+  }
+
+  override hurtbox() {
+    if (!this.corporeal) return { x: this.x - 1, y: this.y - 1, w: 1, h: 1 };
+    return super.hurtbox();
+  }
+
+  override takeDamage(amount: number, scene: Scene, fromX?: number, fromY?: number, force = 120): boolean {
+    if (!this.corporeal) {
+      scene.audio.play('block');
+      scene.effects.burst(this.x, this.y - 12, 4, PAL.wispLight, { speed: 50, life: 0.25 });
+      return false;
+    }
+    return super.takeDamage(amount, scene, fromX, fromY, force);
+  }
+
+  override update(dt: number, scene: Scene): void {
+    this.baseUpdate(dt, scene);
+    if (this.stun > 0) return;
+    this.timer -= dt;
+    this.z = 10 + Math.sin(this.animTime * 5) * 3;
+
+    const player = scene.player;
+    const dx = player.x - this.x;
+    const dy = player.y - this.y;
+    const len = Math.hypot(dx, dy) || 1;
+
+    if (this.corporeal) {
+      moveWithCollision(this, (dx / len) * this.stats.speed * 1.4 * dt, (dy / len) * this.stats.speed * 1.4 * dt, scene);
+      if (this.timer <= 0.28 && this.timer + dt > 0.28) {
+        scene.spawn(new EnemyShot(this.x, this.y - 12, dx / len, dy / len, 1, 'bolt', 96));
+        scene.audio.play('swing');
+      }
+      if (this.timer <= 0) {
+        this.corporeal = false;
+        this.timer = rng.range(1.1, 1.8);
+      }
+    } else {
+      this.dirX += rng.range(-0.8, 0.8) * dt;
+      this.dirY += rng.range(-0.8, 0.8) * dt;
+      const drift = Math.hypot(this.dirX, this.dirY) || 1;
+      moveWithCollision(
+        this,
+        (this.dirX / drift) * this.stats.speed * 0.7 * dt,
+        (this.dirY / drift) * this.stats.speed * 0.7 * dt,
+        scene,
+      );
+      if (this.timer <= 0 && dist(this.x, this.y, player.x, player.y) < 120) {
+        this.corporeal = true;
+        this.timer = rng.range(1.4, 2.0);
+        this.facing = vectorToDir(dx, dy, this.facing);
+      }
+    }
+  }
+
+  override draw(g: Gfx): void {
+    const anim = g.art.actors.wisp.idle;
+    const frames = anim.frames.down;
+    const frame = frames[Math.floor(this.animTime * (this.corporeal ? 12 : 6)) % frames.length];
+    this.drawShadow(g, this.corporeal ? 10 : 6);
+    g.ctx.save();
+    g.ctx.globalAlpha = this.corporeal ? 1 : 0.35 + Math.sin(g.time * 8) * 0.12;
+    this.drawFrame(g, frame, anim.ox, anim.oy);
+    g.ctx.restore();
+    if (this.corporeal) {
+      g.ctx.save();
+      g.ctx.globalAlpha = 0.22 + Math.sin(g.time * 10) * 0.08;
+      g.ctx.fillStyle = PAL.wispLight;
+      g.ctx.beginPath();
+      g.ctx.ellipse(this.x - g.camX, this.y - g.camY - 12, 9, 10, 0, 0, Math.PI * 2);
+      g.ctx.fill();
+      g.ctx.restore();
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+
+/**
+ * Marsh crab. Sidesteps with its shell toward you, then snaps — the only
+ * moment the armour drops.
+ */
+export class Crab extends Enemy {
+  private state: 'sidestep' | 'wind' | 'snap' | 'recover' = 'sidestep';
+  private timer = rng.range(0.5, 1.4);
+  private moveSign = rng.chance(0.5) ? 1 : -1;
+  private toward = { x: 0, y: 1 };
+
+  constructor(x: number, y: number) {
+    super('crab', x, y);
+    this.w = 14;
+    this.h = 10;
+  }
+
+  override blocksFrom(fromX: number, fromY: number): boolean {
+    if (this.state === 'snap' || this.state === 'recover') return false;
+    const dx = fromX - this.x;
+    const dy = fromY - this.y;
+    const len = Math.hypot(dx, dy) || 1;
+    return (dx / len) * this.toward.x + (dy / len) * this.toward.y > 0.35;
+  }
+
+  override update(dt: number, scene: Scene): void {
+    this.baseUpdate(dt, scene);
+    if (this.stun > 0) return;
+    this.timer -= dt;
+
+    const player = scene.player;
+    const dx = player.x - this.x;
+    const dy = player.y - this.y;
+    const len = Math.hypot(dx, dy) || 1;
+    this.toward = { x: dx / len, y: dy / len };
+    this.facing = vectorToDir(dx, dy, this.facing);
+
+    switch (this.state) {
+      case 'sidestep': {
+        const sx = -this.toward.y * this.moveSign;
+        const sy = this.toward.x * this.moveSign;
+        const res = moveWithCollision(this, sx * this.stats.speed * dt, sy * this.stats.speed * dt, scene);
+        if (res.hitX || res.hitY) this.moveSign *= -1;
+        if (this.timer <= 0 && dist(this.x, this.y, player.x, player.y) < 100) {
+          this.state = 'wind';
+          this.timer = 0.35;
+          scene.audio.play('charge');
+        } else if (this.timer <= 0) {
+          this.timer = rng.range(0.5, 1.2);
+          this.moveSign *= -1;
+        }
+        break;
+      }
+      case 'wind':
+        if (this.timer <= 0) {
+          this.state = 'snap';
+          this.timer = 0.32;
+        }
+        break;
+      case 'snap': {
+        moveWithCollision(this, this.toward.x * 210 * dt, this.toward.y * 210 * dt, scene);
+        if (this.timer <= 0) {
+          this.state = 'recover';
+          this.timer = 0.7;
+          scene.effects.dust(this.x, this.y, 6);
+        }
+        break;
+      }
+      case 'recover':
+        if (this.timer <= 0) {
+          this.state = 'sidestep';
+          this.timer = rng.range(0.6, 1.3);
+        }
+        break;
+    }
+  }
+
+  override draw(g: Gfx): void {
+    this.drawAnim(g, g.art.actors.crab.idle, this.state === 'snap' ? 12 : 4);
+    if (this.state === 'recover') {
+      g.ctx.save();
+      g.ctx.globalAlpha = 0.28 + Math.sin(g.time * 12) * 0.1;
+      g.ctx.fillStyle = PAL.uiBad;
+      g.ctx.beginPath();
+      g.ctx.ellipse(this.x - g.camX, this.y - g.camY - 8, 10, 7, 0, 0, Math.PI * 2);
+      g.ctx.fill();
+      g.ctx.restore();
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+
 export function createEnemy(kind: EnemyKind, x: number, y: number): Enemy {
   switch (kind) {
     case 'slime':
@@ -437,6 +631,10 @@ export function createEnemy(kind: EnemyKind, x: number, y: number): Enemy {
       return new Stalfos(x, y);
     case 'thornling':
       return new Thornling(x, y);
+    case 'wisp':
+      return new Wisp(x, y);
+    case 'crab':
+      return new Crab(x, y);
   }
 }
 
@@ -447,4 +645,6 @@ export const DEATH_COLOR: Record<EnemyKind, string> = {
   keese: PAL.bat,
   stalfos: PAL.plaster,
   thornling: PAL.plant,
+  wisp: PAL.wispLight,
+  crab: PAL.crab,
 };

@@ -178,7 +178,17 @@ export class SignPost extends Prop {
 
 // ---------------------------------------------------------------------------
 
-export type NpcId = 'elder' | 'smith' | 'child' | 'elderIndoors' | 'smithIndoors' | 'herbalist' | 'mirror';
+export type NpcId =
+  | 'elder'
+  | 'smith'
+  | 'child'
+  | 'elderIndoors'
+  | 'smithIndoors'
+  | 'herbalist'
+  | 'mirror'
+  | 'miller'
+  | 'millerIndoors'
+  | 'cal';
 
 const NPC_COLORS: Record<NpcId, { robe: string; trim: string; hair: string }> = {
   elder: { robe: '#6a5ca8', trim: '#9c8fd6', hair: PAL.white },
@@ -188,6 +198,9 @@ const NPC_COLORS: Record<NpcId, { robe: string; trim: string; hair: string }> = 
   child: { robe: '#3f8ac0', trim: '#79c0e8', hair: PAL.hair },
   herbalist: { robe: '#3f8a5a', trim: '#6fc48a', hair: '#b04a7a' },
   mirror: { robe: PAL.steelDark, trim: PAL.steelLight, hair: PAL.hair },
+  miller: { robe: '#8a7a3a', trim: '#c4b46a', hair: '#6a4a22' },
+  millerIndoors: { robe: '#8a7a3a', trim: '#c4b46a', hair: '#6a4a22' },
+  cal: { robe: '#4a6a8a', trim: '#7aa0c0', hair: PAL.hairDark },
 };
 
 export class Npc extends Prop {

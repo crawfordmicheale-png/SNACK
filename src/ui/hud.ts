@@ -4,7 +4,7 @@
  */
 import { PAL, RARITY_COLORS, withAlpha } from '../art/palette';
 import { clamp } from '../engine/math';
-import { Thornmaw } from '../game/entities/boss';
+import { Thornmaw, Tideheart } from '../game/entities/boss';
 import { itemDef } from '../game/items/itemdefs';
 import { stackName } from '../game/items/loot';
 import { xpToNext } from '../game/mastery';
@@ -154,12 +154,15 @@ function drawXpStrip(u: UiCtx, scene: Scene): void {
 }
 
 function drawBossBar(u: UiCtx, scene: Scene): void {
-  const boss = scene.entities.find((e): e is Thornmaw => e instanceof Thornmaw && !e.dead && e.isAwake);
+  const boss =
+    scene.entities.find((e): e is Thornmaw => e instanceof Thornmaw && !e.dead && e.isAwake) ??
+    scene.entities.find((e): e is Tideheart => e instanceof Tideheart && !e.dead && e.isAwake);
   if (!boss) return;
   const w = u.w * 0.6;
   const x = (u.w - w) / 2;
   const y = 12;
-  text(u, 'THORNMAW', u.w / 2, y - 10, { align: 'center', size: 8, weight: 700, color: PAL.bloodLight, letterSpacing: 1.5 });
+  const name = boss instanceof Tideheart ? 'TIDEHEART' : 'THORNMAW';
+  text(u, name, u.w / 2, y - 10, { align: 'center', size: 8, weight: 700, color: PAL.bloodLight, letterSpacing: 1.5 });
   bar(u, x, y, w, 6, boss.healthFraction(), PAL.blood, withAlpha(PAL.black, 0.75));
 }
 

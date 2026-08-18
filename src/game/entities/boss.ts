@@ -10,6 +10,7 @@ import { Entity, moveWithCollision, type Gfx } from '../entity';
 import type { Scene } from '../scene';
 import { createEnemy, Enemy } from './enemies';
 import { EnemyShot } from './projectiles';
+import { VIEW_H, VIEW_W } from '../../engine/screen';
 
 type BossPhase = 'dormant' | 'idle' | 'wind' | 'spit' | 'vulnerable' | 'summon' | 'enraged' | 'dying';
 
@@ -325,5 +326,343 @@ export class Warden extends Enemy {
   /** Warden death is handled as a mini-boss by the scene. */
   protected override onDeath(scene: Scene): void {
     scene.onMinibossKilled(this);
+  }
+}
+
+// ---------------------------------------------------------------------------
+
+/**
+ * Bellwight: a drowned warden. Teleports in a ring of motes, then hangs
+ * visible and open just long enough to cut.
+ */
+export class Bellwight extends Enemy {
+  private state: 'drift' | 'vanish' | 'appear' | 'volley' | 'open' = 'drift';
+  private timer = 1.4;
+
+  constructor(x: number, y: number) {
+    super('wisp', x, y);
+    this.w = 14;
+    this.h = 14;
+    this.maxHp = 30;
+    this.hp = this.maxHp;
+    this.solidBody = false;
+    this.z = 8;
+  }
+
+  protected override armorValue(): number {
+    return this.state === 'open' ? 0 : 3;
+  }
+
+  protected override damageMultiplier(): number {
+    return this.state === 'open' ? 1.8 : 1;
+  }
+
+  override takeDamage(amount: number, scene: Scene, fromX?: number, fromY?: number, force = 120): boolean {
+    if (this.state === 'vanish') {
+      scene.audio.play('block');
+      scene.effects.burst(this.x, this.y - 12, 5, PAL.wispLight, { speed: 60, life: 0.25 });
+      return false;
+    }
+    return super.takeDamage(amount, scene, fromX, fromY, force);
+  }
+
+  override update(dt: number, scene: Scene): void {
+    this.baseUpdate(dt, scene);
+    if (this.stun > 0 && this.state !== 'vanish') return;
+    this.timer -= dt;
+    this.z = 8 + Math.sin(this.animTime * 4) * 3;
+
+    const player = scene.player;
+
+    switch (this.state) {
+      case 'drift':
+        this.chase(dt, scene, 28, 0.2);
+        if (this.timer <= 0) {
+          this.state = 'vanish';
+          this.timer = 0.45;
+          scene.audio.play('charge');
+          scene.effects.burst(this.x, this.y - 10, 12, PAL.wisp, { speed: 90, life: 0.4 });
+        }
+        break;
+
+      case 'vanish':
+        if (this.timer <= 0) {
+          const a = rng.next() * Math.PI * 2;
+          const nx = player.x + Math.cos(a) * rng.range(40, 70);
+          const ny = player.y + Math.sin(a) * rng.range(30, 55);
+          const room = scene.activeRoom;
+          if (room) {
+            const ox = room.rx * 320;
+            const oy = room.ry * 208;
+            this.x = clamp(nx, ox + 32, ox + VIEW_W - 32);
+            this.y = clamp(ny, oy + 32, oy + VIEW_H - 32);
+          } else {
+            this.x = nx;
+            this.y = ny;
+          }
+          this.kx = 0;
+          this.ky = 0;
+          this.state = 'appear';
+          this.timer = 0.35;
+          scene.effects.burst(this.x, this.y - 10, 12, PAL.foam, { speed: 90, life: 0.4 });
+        }
+        break;
+
+      case 'appear':
+        if (this.timer <= 0) {
+          this.state = 'volley';
+          this.timer = 0.9;
+        }
+        break;
+
+      case 'volley': {
+        if (rng.chance(dt * 8)) {
+          const a = Math.atan2(player.y - this.y, player.x - this.x) + rng.range(-0.25, 0.25);
+          scene.spawn(new EnemyShot(this.x, this.y - 14, Math.cos(a), Math.sin(a), 2, 'bolt', 110));
+        }
+        if (this.timer <= 0) {
+          this.state = 'open';
+          this.timer = 1.4;
+          scene.audio.play('hurt');
+        }
+        break;
+      }
+
+      case 'open':
+        if (this.timer <= 0) {
+          this.state = 'drift';
+          this.timer = 1.1;
+        }
+        break;
+    }
+  }
+
+  override draw(g: Gfx): void {
+    const anim = g.art.actors.wisp.idle;
+    const frames = anim.frames.down;
+    const frame = frames[Math.floor(this.animTime * 10) % frames.length];
+    const hidden = this.state === 'vanish';
+    this.drawShadow(g, hidden ? 8 : 16);
+    const dx = Math.round(this.x - g.camX + anim.ox * 1.6);
+    const dy = Math.round(this.y - g.camY + anim.oy * 1.6);
+    g.ctx.save();
+    g.ctx.imageSmoothingEnabled = false;
+    g.ctx.globalAlpha = hidden ? 0.2 : 1;
+    g.ctx.drawImage(frame, dx, dy, frame.width * 1.6, frame.height * 1.6);
+    if (this.flash > 0) {
+      g.ctx.globalCompositeOperation = 'lighter';
+      g.ctx.globalAlpha = clamp(this.flash * 5, 0, 0.85);
+      g.ctx.drawImage(frame, dx, dy, frame.width * 1.6, frame.height * 1.6);
+    }
+    g.ctx.restore();
+
+    if (this.state === 'open') {
+      g.ctx.save();
+      g.ctx.globalAlpha = 0.3 + Math.sin(g.time * 11) * 0.12;
+      g.ctx.fillStyle = PAL.uiBad;
+      g.ctx.beginPath();
+      g.ctx.ellipse(this.x - g.camX, this.y - g.camY - 14, 12, 11, 0, 0, Math.PI * 2);
+      g.ctx.fill();
+      g.ctx.restore();
+    }
+  }
+
+  protected override onDeath(scene: Scene): void {
+    scene.onBellwightKilled(this);
+  }
+}
+
+// ---------------------------------------------------------------------------
+
+type TidePhase = 'dormant' | 'idle' | 'wind' | 'ring' | 'vulnerable' | 'summon' | 'enraged';
+
+/** Tideheart, the drowned bell that the Hollow Root was feeding. */
+export class Tideheart extends Entity {
+  private phase: TidePhase = 'dormant';
+  private timer = 0;
+  private cycle = 0;
+  spawnIndex = -1;
+  private introDone = false;
+  private minions: Enemy[] = [];
+
+  constructor(x: number, y: number) {
+    super();
+    this.x = x;
+    this.y = y;
+    this.team = 'enemy';
+    this.w = 34;
+    this.h = 26;
+    this.maxHp = 72;
+    this.hp = this.maxHp;
+    this.solidBody = true;
+  }
+
+  override hurtbox(): Rect {
+    if (this.phase === 'vulnerable' || this.phase === 'enraged') {
+      return { x: this.x - 16, y: this.y - 40, w: 32, h: 30 };
+    }
+    return { x: this.x - 2, y: this.y - 2, w: 1, h: 1 };
+  }
+
+  private get enraged(): boolean {
+    return this.hp <= this.maxHp * 0.4;
+  }
+
+  override takeDamage(amount: number, scene: Scene, fromX?: number, fromY?: number): boolean {
+    if (this.phase !== 'vulnerable' && this.phase !== 'enraged') {
+      scene.audio.play('block');
+      scene.effects.burst(fromX ?? this.x, (fromY ?? this.y) - 10, 6, PAL.foam, { speed: 70, life: 0.3 });
+      return false;
+    }
+    const landed = super.takeDamage(amount, scene, fromX, fromY, 0);
+    if (landed) {
+      this.kx = 0;
+      this.ky = 0;
+      scene.effects.addShake(3);
+      scene.effects.burst(this.x, this.y - 26, 10, PAL.waterLight, { speed: 100, life: 0.4 });
+      if (!this.dead) {
+        this.phase = 'idle';
+        this.timer = this.enraged ? 0.45 : 0.85;
+      }
+    }
+    return landed;
+  }
+
+  protected override onDeath(scene: Scene): void {
+    scene.onTideheartKilled(this);
+  }
+
+  override update(dt: number, scene: Scene): void {
+    this.tickCommon(dt);
+    this.timer -= dt;
+    this.minions = this.minions.filter((m) => !m.dead);
+
+    const player = scene.player;
+
+    if (this.phase === 'dormant') {
+      if (dist(this.x, this.y, player.x, player.y) < 110) {
+        this.phase = 'idle';
+        this.timer = 1.2;
+        if (!this.introDone) {
+          this.introDone = true;
+          scene.audio.play('secret');
+          scene.effects.addShake(6);
+          scene.showBanner('TIDEHEART', 'The Drowned Bell');
+        }
+      }
+      return;
+    }
+
+    if (!player.dead && rectsOverlap({ x: this.x - 20, y: this.y - 34, w: 40, h: 34 }, player.hurtbox())) {
+      player.takeDamage(2, scene, this.x, this.y, 240);
+    }
+
+    switch (this.phase) {
+      case 'idle':
+        if (this.timer <= 0) {
+          this.cycle++;
+          this.phase = this.cycle % 3 === 0 ? 'summon' : 'wind';
+          this.timer = this.phase === 'summon' ? 0.7 : 0.55;
+        }
+        break;
+
+      case 'wind':
+        if (this.timer <= 0) {
+          this.fireRing(scene, this.enraged ? 10 : 8);
+          this.phase = 'ring';
+          this.timer = this.enraged ? 1.1 : 0.85;
+          scene.audio.play('charge');
+        }
+        break;
+
+      case 'ring':
+        if (this.enraged && this.timer < 0.45 && this.timer + dt >= 0.45) {
+          this.fireRing(scene, 8, 0.4);
+        }
+        if (this.timer <= 0) {
+          this.phase = this.enraged ? 'enraged' : 'vulnerable';
+          this.timer = this.enraged ? 2.4 : 2.1;
+          scene.audio.play('hurt');
+        }
+        break;
+
+      case 'vulnerable':
+      case 'enraged':
+        if (this.phase === 'enraged' && rng.chance(dt * 4)) {
+          const a = rng.next() * Math.PI * 2;
+          scene.spawn(new EnemyShot(this.x, this.y - 22, Math.cos(a), Math.sin(a), 2, 'bolt', 90));
+        }
+        if (this.timer <= 0) {
+          this.phase = 'idle';
+          this.timer = this.enraged ? 0.55 : 0.95;
+        }
+        break;
+
+      case 'summon': {
+        if (this.timer <= 0) {
+          if (this.minions.length < 4) {
+            for (let i = 0; i < (this.enraged ? 3 : 2); i++) {
+              const a = rng.next() * Math.PI * 2;
+              const kind = rng.chance(0.5) ? 'crab' : 'wisp';
+              const m = createEnemy(kind, this.x + Math.cos(a) * 46, this.y + Math.sin(a) * 34);
+              this.minions.push(m);
+              scene.spawn(m);
+              scene.effects.burst(m.x, m.y - 8, 8, PAL.foam, { speed: 70 });
+            }
+            scene.audio.play('charge');
+          }
+          this.phase = 'idle';
+          this.timer = 1.0;
+        }
+        break;
+      }
+    }
+  }
+
+  override draw(g: Gfx): void {
+    const art = g.art.actors.tideheart;
+    const open = this.phase === 'vulnerable' || this.phase === 'enraged' || this.phase === 'ring';
+    const set = this.flash > 0 ? art.hurt : open ? art.open : art.idle;
+    const frame = set[Math.floor(this.animTime * (this.enraged ? 8 : 4)) % set.length];
+
+    this.drawShadow(g, 40);
+    const shudder = this.phase === 'wind' ? Math.sin(this.animTime * 40) * 1.6 : 0;
+    const dx = Math.round(this.x - g.camX + art.ox + shudder);
+    const dy = Math.round(this.y - g.camY + art.oy);
+    g.ctx.drawImage(frame, dx, dy);
+
+    if (this.flash > 0) {
+      g.ctx.save();
+      g.ctx.globalCompositeOperation = 'lighter';
+      g.ctx.globalAlpha = clamp(this.flash * 5, 0, 0.8);
+      g.ctx.drawImage(frame, dx, dy);
+      g.ctx.restore();
+    }
+
+    if (open) {
+      g.ctx.save();
+      g.ctx.globalAlpha = 0.22 + Math.sin(g.time * 9) * 0.08;
+      g.ctx.fillStyle = withAlpha(PAL.foam, 1);
+      g.ctx.beginPath();
+      g.ctx.ellipse(this.x - g.camX, this.y - g.camY - 24, 16, 14, 0, 0, Math.PI * 2);
+      g.ctx.fill();
+      g.ctx.restore();
+    }
+  }
+
+  private fireRing(scene: Scene, count: number, offset = 0): void {
+    const base = this.animTime + offset;
+    for (let i = 0; i < count; i++) {
+      const a = base + (i / count) * Math.PI * 2;
+      scene.spawn(new EnemyShot(this.x, this.y - 22, Math.cos(a), Math.sin(a), 2, 'bolt', this.enraged ? 118 : 96));
+    }
+  }
+
+  healthFraction(): number {
+    return clamp(this.hp / this.maxHp, 0, 1);
+  }
+
+  get isAwake(): boolean {
+    return this.phase !== 'dormant';
   }
 }

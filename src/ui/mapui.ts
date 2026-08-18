@@ -6,11 +6,13 @@ import { PAL, withAlpha } from '../art/palette';
 import { ROOM_COLS, ROOM_ROWS } from '../engine/screen';
 import { Chest } from '../game/entities/props';
 import type { Scene } from '../game/scene';
+import type { RoomRuntime } from '../world/world';
 import { clipText, icon, panel, rect, strokeRect, text, type UiCtx } from './draw';
 
 export function drawMapTab(m: UiCtx, scene: Scene): void {
   const world = scene.world;
-  const reveal = scene.progression.has('reveal') || scene.inventory.has('dungeonMap');
+  const reveal = scene.progression.has('reveal') || (world.def.dungeon === true && scene.inventory.has('dungeonMap'));
+  const hasCompass = scene.inventory.has('compass') || scene.progression.has('reveal');
 
   text(m, world.def.name.toUpperCase(), 20, 58, { size: 14, weight: 700, color: PAL.uiAccent, letterSpacing: 2 });
   text(m, scene.activeRoom?.def.name ?? '', 20, 78, { size: 11, color: PAL.uiTextDim });
@@ -43,6 +45,7 @@ export function drawMapTab(m: UiCtx, scene: Scene): void {
       if (!known) {
         rect(m, x + 2, y + 2, cellW - 4, cellH - 4, withAlpha(PAL.uiPanel, 0.28));
         strokeRect(m, x + 2, y + 2, cellW - 4, cellH - 4, withAlpha(PAL.uiEdge, 0.25), 1);
+        if (hasCompass) drawRoomMarkers(m, scene, room, x, y, cellH, true);
         continue;
       }
 
@@ -59,30 +62,7 @@ export function drawMapTab(m: UiCtx, scene: Scene): void {
         });
       }
 
-      // Markers: unopened chests and the boss.
-      const markers: string[] = [];
-      const spawns = room.def.spawns ?? [];
-      spawns.forEach((spawn, index) => {
-        if (room.consumed.has(index)) return;
-        if (spawn.kind === 'chest') markers.push('chest');
-        if (spawn.kind === 'boss') markers.push('boss');
-        if (spawn.kind === 'miniboss') markers.push('miniboss');
-      });
-      // A chest opened this session may still be in the entity list.
-      if (isHere) {
-        for (const e of scene.entities) {
-          if (e instanceof Chest && e.opened) markers.pop();
-        }
-      }
-
-      let mx = x + 6;
-      const my = y + cellH - 22;
-      for (const marker of markers.slice(0, 3)) {
-        if (marker === 'chest') icon(m, m.art.icons.get('chestClosed'), mx, my, 16);
-        else if (marker === 'boss') icon(m, m.art.icons.get('bosskey'), mx, my, 16);
-        else icon(m, m.art.icons.get('shard'), mx, my, 16);
-        mx += 18;
-      }
+      drawRoomMarkers(m, scene, room, x, y, cellH);
 
       if (isHere) {
         // Player dot, positioned within the room cell.
@@ -95,6 +75,33 @@ export function drawMapTab(m: UiCtx, scene: Scene): void {
   }
 
   drawLegend(m, scene, originX + gridW + 30, originY);
+}
+
+function drawRoomMarkers(m: UiCtx, scene: Scene, room: RoomRuntime, x: number, y: number, cellH: number, force = false): void {
+  const hasCompass = scene.inventory.has('compass') || scene.progression.has('reveal');
+  const markers: string[] = [];
+  if (force || hasCompass || room.visited) {
+    const spawns = room.def.spawns ?? [];
+    spawns.forEach((spawn, index) => {
+      if (room.consumed.has(index)) return;
+      if (spawn.kind === 'chest') markers.push('chest');
+      if (spawn.kind === 'boss' || spawn.kind === 'tideheart') markers.push('boss');
+      if (spawn.kind === 'miniboss' || spawn.kind === 'bellwight') markers.push('miniboss');
+    });
+  }
+  if (room === scene.activeRoom) {
+    for (const e of scene.entities) {
+      if (e instanceof Chest && e.opened) markers.pop();
+    }
+  }
+  let mx = x + 6;
+  const my = y + cellH - 22;
+  for (const marker of markers.slice(0, 3)) {
+    if (marker === 'chest') icon(m, m.art.icons.get('chestClosed'), mx, my, 16);
+    else if (marker === 'boss') icon(m, m.art.icons.get('bosskey'), mx, my, 16);
+    else icon(m, m.art.icons.get('shard'), mx, my, 16);
+    mx += 18;
+  }
 }
 
 function drawLegend(m: UiCtx, scene: Scene, x: number, y: number): void {
@@ -120,6 +127,13 @@ function drawLegend(m: UiCtx, scene: Scene, x: number, y: number): void {
   text(m, `${explored} / ${total} rooms`, x + 12, y + 128, { size: 11, weight: 700, color: PAL.uiText });
 
   if (!scene.progression.has('reveal')) {
-    text(m, 'The Pathfinder mastery reveals the rest.', x + 12, y + 152, { size: 9, color: withAlpha(PAL.uiTextDim, 0.7) });
+    const hint = scene.world.def.dungeon
+      ? scene.inventory.has('dungeonMap')
+        ? scene.inventory.has('compass')
+          ? 'Map and compass are working.'
+          : 'A compass would mark chests and bosses.'
+        : 'A dungeon map would reveal this floor.'
+      : 'The Pathfinder mastery reveals the rest.';
+    text(m, hint, x + 12, y + 152, { size: 9, color: withAlpha(PAL.uiTextDim, 0.7) });
   }
 }

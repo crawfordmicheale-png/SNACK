@@ -9,11 +9,13 @@ import { LEGEND, Tile, tileDef } from './tiledefs';
 import type { MapDef, RoomDef } from './types';
 import { OVERWORLD } from './maps/overworld';
 import { DUNGEON } from './maps/dungeon';
+import { DROWNED } from './maps/drowned';
 import { INTERIORS } from './maps/interiors';
 
 export const MAPS: Record<string, MapDef> = {
   overworld: OVERWORLD,
   dungeon: DUNGEON,
+  drowned: DROWNED,
   interiors: INTERIORS,
 };
 

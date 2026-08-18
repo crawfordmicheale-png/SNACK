@@ -64,14 +64,14 @@ export function drawVictory(u: UiCtx, scene: Scene, elapsed: number): void {
     rect(m, px * m.w, m.h - t * m.h, 2, 2, withAlpha(PAL.magicLight, (1 - t) * 0.5));
   }
 
-  text(m, 'THE ROOT IS CUT', m.w / 2, 96, {
+  text(m, 'THE HOLLOW SLEEPS', m.w / 2, 96, {
     align: 'center',
     size: 32,
     weight: 700,
     color: PAL.uiAccent,
     letterSpacing: 5,
   });
-  text(m, 'Thornmaw is dead. Elderbrook will sleep tonight.', m.w / 2, 144, {
+  text(m, 'Tideheart is silent. Root and bell are both cut.', m.w / 2, 144, {
     align: 'center',
     size: 13,
     color: PAL.uiText,
@@ -98,8 +98,8 @@ export function drawVictory(u: UiCtx, scene: Scene, elapsed: number): void {
     text(m, value, boxX + boxW - 20, y, { align: 'right', size: 12, weight: 700, color: PAL.uiText });
   });
 
-  icon(m, m.art.icons.get('sword3'), m.w / 2 - 16, boxY + boxH + 18, 32);
-  text(m, 'The Hollow Edge is yours.', m.w / 2, boxY + boxH + 58, {
+  icon(m, m.art.icons.get('sword4'), m.w / 2 - 16, boxY + boxH + 18, 32);
+  text(m, 'Tidebrand is yours. The marsh will remember.', m.w / 2, boxY + boxH + 58, {
     align: 'center',
     size: 11,
     color: PAL.magicLight,
