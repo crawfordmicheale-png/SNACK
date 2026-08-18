@@ -92,8 +92,8 @@ const TIER_WEIGHTS: Record<number, number[]> = {
 /** Base items that random loot can roll, by category. */
 const LOOT_POOL: Record<number, string[]> = {
   1: ['gel', 'boneShard', 'potion', 'arrow', 'bomb', 'tunic1', 'shield1'],
-  2: ['potion', 'elixir', 'arrow', 'bomb', 'tunic1', 'shield1', 'ringVigor', 'ringSwift', 'thornSeed'],
-  3: ['sword2', 'shield2', 'tunic2', 'ringKeen', 'amuletArcane', 'elixir', 'ether', 'thornSeed', 'ancientCoin'],
+  2: ['potion', 'elixir', 'arrow', 'bomb', 'tunic1', 'shield1', 'ringVigor', 'ringSwift', 'thornSeed', 'wispDust', 'crabShell'],
+  3: ['sword2', 'shield2', 'tunic2', 'ringKeen', 'amuletArcane', 'elixir', 'ether', 'thornSeed', 'ancientCoin', 'wispDust'],
   4: ['sword2', 'shield2', 'tunic2', 'tunic3', 'ringKeen', 'amuletArcane', 'amuletLuck', 'ether', 'ancientCoin', 'fairy'],
   5: ['sword2', 'tunic3', 'amuletLuck', 'amuletArcane', 'ether', 'fairy', 'ancientCoin'],
 };
@@ -252,6 +252,18 @@ export const DROP_TABLES: Record<string, DropRule[]> = {
     { kind: 'thornSeed', chance: 0.3 },
     { kind: 'bomb', chance: 0.15, min: 1, max: 3 },
   ],
+  wisp: [
+    { kind: 'heart', chance: 0.18 },
+    { kind: 'magic', chance: 0.4 },
+    { kind: 'wispDust', chance: 0.4 },
+    { kind: 'rupee', chance: 0.25, min: 2, max: 5 },
+  ],
+  crab: [
+    { kind: 'heart', chance: 0.2 },
+    { kind: 'rupee', chance: 0.4, min: 2, max: 6 },
+    { kind: 'crabShell', chance: 0.4 },
+    { kind: 'arrow', chance: 0.2, min: 2, max: 4 },
+  ],
   miniboss: [
     { kind: 'heart', chance: 1 },
     { kind: 'rupee', chance: 1, min: 20, max: 30 },
@@ -266,6 +278,8 @@ export const ENEMY_LOOT_TIER: Record<string, number> = {
   keese: 1,
   stalfos: 2,
   thornling: 2,
+  wisp: 2,
+  crab: 2,
   miniboss: 4,
   boss: 5,
 };

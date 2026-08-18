@@ -335,6 +335,52 @@ function drawStalfos(p: Painter, dir: Dir, frame: number): void {
   else p.rect(1, 10, 4, 6, shade(PAL.bronze, 0.7));
 }
 
+function drawWisp(p: Painter, frame: number): void {
+  const pulse = [0, 1, 2, 1][frame];
+  const r = 3.4 + pulse * 0.5;
+  p.ellipse(8, 9, r + 2.4, r + 3, withAlpha(PAL.wispDark, 0.45));
+  p.ellipse(8, 9, r + 1, r + 1.6, PAL.wisp);
+  p.ellipse(8, 8.5, r - 0.4, r, PAL.wispLight);
+  p.px(7, 8, PAL.white);
+  p.px(8, 7, PAL.white);
+  // Trailing motes.
+  p.px(5, 13 - pulse, withAlpha(PAL.wispLight, 0.8));
+  p.px(11, 12 - pulse, withAlpha(PAL.wisp, 0.7));
+  p.px(8, 14, withAlpha(PAL.wispDark, 0.8));
+}
+
+function drawCrab(p: Painter, dir: Dir, frame: number): void {
+  const pinch = frame % 2;
+  p.ellipse(8, 11, 6, 4, PAL.crabDark);
+  p.ellipse(8, 10.5, 5, 3.2, PAL.crab);
+  p.ellipse(6.5, 9, 2, 1.4, PAL.crabLight);
+  // Eyes on stalks.
+  p.rect(5, 6, 1, 3, PAL.crabDark);
+  p.rect(10, 6, 1, 3, PAL.crabDark);
+  p.px(5, 5, PAL.eyeWhite);
+  p.px(10, 5, PAL.eyeWhite);
+  p.px(5, 5, PAL.pupil);
+  p.px(10, 5, PAL.pupil);
+  // Claws — the leading pair snaps.
+  const reach = 3 + pinch;
+  if (dir === 'left') {
+    p.line(4, 10, 4 - reach, 8, PAL.crabDark);
+    p.line(4, 11, 4 - reach, 13, PAL.crab);
+    p.px(4 - reach, 8, PAL.crabLight);
+  } else if (dir === 'right') {
+    p.line(12, 10, 12 + reach, 8, PAL.crabDark);
+    p.line(12, 11, 12 + reach, 13, PAL.crab);
+    p.px(12 + reach, 8, PAL.crabLight);
+  } else {
+    p.line(3, 10, 1, 8 + pinch, PAL.crabDark);
+    p.line(13, 10, 15, 8 + pinch, PAL.crabDark);
+    p.px(1, 8 + pinch, PAL.crabLight);
+    p.px(15, 8 + pinch, PAL.crabLight);
+  }
+  // Legs.
+  p.px(3, 14, PAL.crabDark).px(6, 15, PAL.crabDark).px(10, 15, PAL.crabDark).px(13, 14, PAL.crabDark);
+}
+
 function drawThornling(p: Painter, frame: number): void {
   const open = frame % 2 === 0;
   p.rect(7, 12, 2, 5, PAL.plantDark);
@@ -360,6 +406,50 @@ function drawThornling(p: Painter, frame: number): void {
 
 const BOSS_W = 48;
 const BOSS_H = 48;
+
+function drawTideheart(p: Painter, frame: number, state: 'idle' | 'open' | 'hurt'): void {
+  const pulse = frame % 2;
+  const body = state === 'hurt' ? PAL.bloodDark : PAL.waterDeep;
+  const bodyLight = state === 'hurt' ? PAL.blood : PAL.water;
+
+  // Ripple rings around the bell.
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * Math.PI * 2 + frame * 0.2;
+    const x = 24 + Math.cos(a) * 18;
+    const y = 36 + Math.sin(a) * 8;
+    p.line(24, 34, Math.round(x), Math.round(y), PAL.waterDeep);
+    p.px(Math.round(x), Math.round(y), PAL.foam);
+  }
+
+  // Bell body.
+  p.ellipse(24, 22, 14, 16, body);
+  p.ellipse(24, 21, 12, 14, bodyLight);
+  p.ellipse(18, 16, 5, 4, PAL.waterLight);
+  p.rect(16, 28, 16, 6, body);
+  p.hline(14, 34, 20, PAL.goldDark);
+  p.hline(16, 35, 16, PAL.gold);
+
+  // Clapper / eye.
+  if (state === 'open' || state === 'hurt') {
+    p.ellipse(24, 24, 8, 8, PAL.bloodDark);
+    p.ellipse(24, 24, 6, 6, PAL.eyeWhite);
+    p.ellipse(24, 24, 3, 3.4, PAL.pupil);
+    p.ellipse(24, 24, 1.6, 1.8, state === 'hurt' ? PAL.fire : PAL.foam);
+    p.px(22, 22, PAL.white);
+  } else {
+    p.ellipse(24, 26, 4, 6, PAL.goldDark);
+    p.ellipse(24, 28, 3, 4, PAL.gold);
+    p.px(24, 32, PAL.goldLight);
+  }
+
+  // Spray while ringing.
+  if (state === 'open') {
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2 + (pulse ? 0.2 : 0);
+      p.px(Math.round(24 + Math.cos(a) * 16), Math.round(22 + Math.sin(a) * 14), PAL.foam);
+    }
+  }
+}
 
 function drawThornmaw(p: Painter, frame: number, state: 'idle' | 'open' | 'hurt'): void {
   const pulse = frame % 2;
@@ -420,7 +510,10 @@ export interface ActorLibrary {
   keese: ActorArt;
   stalfos: ActorArt;
   thornling: ActorArt;
+  wisp: ActorArt;
+  crab: ActorArt;
   boss: { idle: Canvas[]; open: Canvas[]; hurt: Canvas[]; w: number; h: number; ox: number; oy: number };
+  tideheart: { idle: Canvas[]; open: Canvas[]; hurt: Canvas[]; w: number; h: number; ox: number; oy: number };
 }
 
 function omniAnim(w: number, h: number, ox: number, oy: number, count: number, draw: (p: Painter, f: number) => void): AnimSet {
@@ -440,6 +533,16 @@ export function buildActorLibrary(): ActorLibrary {
     for (let f = 0; f < 2; f++) {
       const p = new Painter(BOSS_W, BOSS_H);
       drawThornmaw(p, f, state);
+      list.push(p.canvas);
+    }
+    return list;
+  };
+
+  const tideFrames = (state: 'idle' | 'open' | 'hurt') => {
+    const list: Canvas[] = [];
+    for (let f = 0; f < 2; f++) {
+      const p = new Painter(BOSS_W, BOSS_H);
+      drawTideheart(p, f, state);
       list.push(p.canvas);
     }
     return list;
@@ -467,10 +570,27 @@ export function buildActorLibrary(): ActorLibrary {
       idle: omniAnim(16, 18, -8, -16, 2, (p, f) => drawThornling(p, f)),
       walk: omniAnim(16, 18, -8, -16, 2, (p, f) => drawThornling(p, f)),
     },
+    wisp: {
+      idle: omniAnim(16, 16, -8, -14, 4, (p, f) => drawWisp(p, f)),
+      walk: omniAnim(16, 16, -8, -14, 4, (p, f) => drawWisp(p, f)),
+    },
+    crab: {
+      idle: buildAnim(16, 18, -8, -16, 2, (p, dir, f) => drawCrab(p, dir, f)),
+      walk: buildAnim(16, 18, -8, -16, 2, (p, dir, f) => drawCrab(p, dir, f)),
+    },
     boss: {
       idle: bossFrames('idle'),
       open: bossFrames('open'),
       hurt: bossFrames('hurt'),
+      w: BOSS_W,
+      h: BOSS_H,
+      ox: -24,
+      oy: -42,
+    },
+    tideheart: {
+      idle: tideFrames('idle'),
+      open: tideFrames('open'),
+      hurt: tideFrames('hurt'),
       w: BOSS_W,
       h: BOSS_H,
       ox: -24,

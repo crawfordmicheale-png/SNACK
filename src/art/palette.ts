@@ -87,6 +87,12 @@ export const PAL = {
   plantDark: '#2a5a1f',
   plant: '#438a30',
   plantLight: '#68b24c',
+  crabDark: '#8a3a22',
+  crab: '#c45a32',
+  crabLight: '#e88a58',
+  wispDark: '#3a4a8a',
+  wisp: '#6a8ae0',
+  wispLight: '#b0c8ff',
 
   // Effects
   white: '#f7f4e6',

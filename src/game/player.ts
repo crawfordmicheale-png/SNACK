@@ -11,7 +11,7 @@ import { Entity, groundAt, moveWithCollision, slideAroundCorners, type Gfx } fro
 import { itemDef, type StatBlock } from './items/itemdefs';
 import type { Scene } from './scene';
 import { Arrow, Bomb, Boomerang, SlashFx, SwordBeam } from './entities/projectiles';
-import { Stalfos } from './entities/enemies';
+import { Enemy } from './entities/enemies';
 
 const BASE_SPEED = 74;
 const DASH_SPEED = 210;
@@ -309,7 +309,7 @@ export class Player extends Entity {
       if (!rectsOverlap(box, e.hurtbox())) continue;
 
       // A stalfos shield deflects hits that land on its facing.
-      if (e instanceof Stalfos && e.blocksFrom(this.x, this.y)) {
+      if (e instanceof Enemy && e.blocksFrom(this.x, this.y)) {
         this.swingHits.add(e);
         scene.audio.play('block');
         scene.effects.burst(e.x, e.y - 10, 6, PAL.steelLight, { speed: 80, life: 0.3 });

@@ -18,7 +18,7 @@ import { GameWorld, WorldRegistry, type RoomRuntime } from '../world/world';
 import { Effects } from './effects';
 import { Entity, type Gfx } from './entity';
 import { createEnemy, DEATH_COLOR, Enemy, type EnemyKind } from './entities/enemies';
-import { Thornmaw, Warden } from './entities/boss';
+import { Thornmaw, Warden, Bellwight, Tideheart } from './entities/boss';
 import { Pickup } from './entities/pickups';
 import { Boomerang, Sparkles } from './entities/projectiles';
 import { Bed, Chest, Npc, Pot, Prop, ShopCounter, SignPost, type NpcId } from './entities/props';
@@ -84,6 +84,12 @@ const SHOP_STOCK: Record<string, ShopOffer[]> = {
     { defId: 'elixir', count: 1, price: 70 },
     { defId: 'ether', count: 1, price: 180 },
     { defId: 'fairy', count: 1, price: 240 },
+  ],
+  mill: [
+    { defId: 'arrow', count: 15, price: 36 },
+    { defId: 'bomb', count: 4, price: 32 },
+    { defId: 'potion', count: 1, price: 50 },
+    { defId: 'elixir', count: 1, price: 65 },
   ],
 };
 
@@ -263,7 +269,9 @@ export class Scene {
       case 'octorok':
       case 'keese':
       case 'stalfos':
-      case 'thornling': {
+      case 'thornling':
+      case 'wisp':
+      case 'crab': {
         if (skipEnemies) return null;
         const enemy = createEnemy(spawn.kind as EnemyKind, wx, wy);
         enemy.spawnIndex = index;
@@ -275,11 +283,23 @@ export class Scene {
         boss.spawnIndex = index;
         return boss;
       }
+      case 'tideheart': {
+        if (room.cleared) return null;
+        const boss = new Tideheart(wx, wy);
+        boss.spawnIndex = index;
+        return boss;
+      }
       case 'miniboss': {
         if (room.cleared) return null;
         const warden = new Warden(wx, wy);
         warden.spawnIndex = index;
         return warden;
+      }
+      case 'bellwight': {
+        if (room.cleared) return null;
+        const wight = new Bellwight(wx, wy);
+        wight.spawnIndex = index;
+        return wight;
       }
       case 'chest': {
         const chest = new Chest(wx, wy, String(opts.loot ?? 'random'), Number(opts.tier ?? 2), opts.big === true);
@@ -353,7 +373,10 @@ export class Scene {
 
     const room = this.world.roomForPixel(this.player.x, this.player.y);
     if (room) this.enterRoom(room, true);
-    if (this.world.def.dungeon) this.quest.advanceTo('enterRoot');
+    if (this.world.def.dungeon) {
+      if (this.world.def.id === 'drowned') this.quest.advanceTo('enterBell');
+      else this.quest.advanceTo('enterRoot');
+    }
   }
 
   /** Places the player after a load, without a fade. */
@@ -576,8 +599,10 @@ export class Scene {
         }
         break;
 
-      case 'boss':
-        if (this.inventory.consume('bossKey', 1)) {
+      case 'boss': {
+        const keyId = this.world.def.id === 'drowned' ? 'bellKey' : 'bossKey';
+        const keyName = keyId === 'bellKey' ? 'Bell Key' : 'Root Key';
+        if (this.inventory.consume(keyId, 1)) {
           this.world.setTile(gx, gy, Tile.Doorway);
           // Boss doors are two tiles wide.
           for (const nx of [gx - 1, gx + 1]) {
@@ -588,12 +613,14 @@ export class Scene {
           }
           this.audio.play('secret');
           this.toast(TOASTS.bossDoorOpen);
-          this.quest.advanceTo('boss');
+          if (keyId === 'bellKey') this.quest.advanceTo('drownBoss');
+          else this.quest.advanceTo('boss');
         } else {
           this.audio.play('error');
-          this.toast(TOASTS.bossDoorLocked);
+          this.toast(`A heavy seal. It wants the ${keyName}.`);
         }
         break;
+      }
 
       case 'shrine':
         this.audio.play('select');
@@ -690,13 +717,50 @@ export class Scene {
       this.activeRoom.consumed.add(boss.spawnIndex);
     }
     this.quest.set('bossDefeated');
-    this.quest.advanceTo('done');
     // A permanent container, plus the blade that cut the root.
     this.progression.heartContainers++;
     this.markStatsDirty();
     this.refreshStats();
     this.player.hearts = this.player.maxHearts;
     this.dropReward(boss.x, boss.y + 8, makeStack('sword3'));
+    this.showBanner('THE ROOT IS CUT', 'Thornmaw is dead. The marsh still rings.');
+    this.quest.advanceTo('afterRoot');
+    this.playSong('overworld');
+  }
+
+  onBellwightKilled(wight: Bellwight): void {
+    this.progression.kills++;
+    this.progression.addXp(XP_TABLE.miniboss);
+    this.effects.burst(wight.x, wight.y - 12, 40, PAL.wispLight, { speed: 170, life: 0.8 });
+    this.effects.addShake(7);
+    this.audio.play('secret');
+    if (this.activeRoom) {
+      this.activeRoom.cleared = true;
+      this.activeRoom.consumed.add(wight.spawnIndex);
+    }
+    this.dropReward(wight.x, wight.y, makeStack('bellKey'));
+    this.dropReward(wight.x + 20, wight.y, makeStack('amuletTide'));
+    this.showBanner('THE BELLWIGHT FALLS', 'The nave key is cold in the hand');
+    this.quest.advanceTo('drownBoss');
+  }
+
+  onTideheartKilled(boss: Tideheart): void {
+    this.progression.addXp(XP_TABLE.tideheart);
+    this.effects.addShake(10, 2);
+    this.effects.flashScreen(PAL.foam, 0.9, 1.2);
+    this.effects.burst(boss.x, boss.y - 20, 60, PAL.waterLight, { speed: 200, life: 1.1 });
+    this.audio.play('secret');
+    if (this.activeRoom) {
+      this.activeRoom.cleared = true;
+      this.activeRoom.consumed.add(boss.spawnIndex);
+    }
+    this.quest.set('tideheartDefeated');
+    this.quest.advanceTo('done');
+    this.progression.heartContainers++;
+    this.markStatsDirty();
+    this.refreshStats();
+    this.player.hearts = this.player.maxHearts;
+    this.dropReward(boss.x, boss.y + 8, makeStack('sword4'));
     this.victory = true;
     this.playSong('overworld');
   }
@@ -727,7 +791,9 @@ export class Scene {
     const room = this.activeRoom;
     if (!room || room.cleared) return;
     const hadEnemies = (room.def.spawns ?? []).some((s) =>
-      ['slime', 'octorok', 'keese', 'stalfos', 'thornling', 'boss', 'miniboss'].includes(s.kind),
+      ['slime', 'octorok', 'keese', 'stalfos', 'thornling', 'wisp', 'crab', 'boss', 'miniboss', 'bellwight', 'tideheart'].includes(
+        s.kind,
+      ),
     );
     if (!hadEnemies) return;
     const alive = this.entities.some((e) => e.team === 'enemy' && !e.dead);
@@ -832,6 +898,7 @@ export class Scene {
       this.effects.text(this.player.x, this.player.y - 26, stackName(stack), RARITY_COLORS[stack.rarity]);
     }
     if (stack.defId === 'bow') this.quest.advanceTo('boss');
+    if (stack.defId === 'lantern') this.toast('Hold K to burn magic for light.');
     return true;
   }
 
@@ -910,16 +977,22 @@ export class Scene {
   }
 
   talkTo(npcId: NpcId): void {
+    if (this.tryNpcTrade(npcId)) return;
+
     const pages = npcDialogue(
       npcId,
       {
         hasBoss: this.quest.has('bossDefeated'),
+        hasTideheart: this.quest.has('tideheartDefeated'),
         hasBow: this.inventory.has('bow'),
         hasBossKey: this.inventory.has('bossKey'),
         enteredDungeon: this.worlds.get('dungeon').rooms.get('1,2')?.visited ?? false,
+        enteredDrowned: this.worlds.get('drowned').rooms.get('1,2')?.visited ?? false,
         level: this.progression.level,
         motes: this.progression.motes,
         heartPieces: this.progression.heartPieces,
+        thornSeeds: this.inventory.countOf('thornSeed'),
+        boneShards: this.inventory.countOf('boneShard'),
       },
       this.quest,
     );
@@ -931,9 +1004,49 @@ export class Scene {
       child: 'TILLY',
       herbalist: 'HERBALIST SAE',
       mirror: 'YOUR REFLECTION',
+      miller: 'MILLER OAT',
+      millerIndoors: 'MILLER OAT',
+      cal: 'CAL',
     };
     this.audio.play('menu');
     this.say(names[npcId], pages);
+  }
+
+  /** Completes a favour if the NPC is waiting on goods or news. */
+  private tryNpcTrade(npcId: NpcId): boolean {
+    if ((npcId === 'herbalist') && this.quest.has('seedsReady') && !this.quest.has('seedsDone')) {
+      if (!this.inventory.consume('thornSeed', 5)) return false;
+      this.quest.set('seedsDone');
+      this.giveItem(makeStack('ether'));
+      this.audio.play('secret');
+      this.say('HERBALIST SAE', [
+        'The seeds go still in the bowl. That is how you know they agreed.',
+        'Drink this when the Hollow asks more than you have.',
+      ]);
+      return true;
+    }
+    if ((npcId === 'smith' || npcId === 'smithIndoors') && this.quest.has('bonesReady') && !this.quest.has('bonesDone')) {
+      if (!this.inventory.consume('boneShard', 8)) return false;
+      this.quest.set('bonesDone');
+      this.giveItem(makeStack('ringSmith'));
+      this.audio.play('secret');
+      this.say('SMITH BREN', [
+        'Eight shards, eight strikes, and a ring that will not bend.',
+        'Wear it. Tell people a smith made it, if they ask.',
+      ]);
+      return true;
+    }
+    if (npcId === 'child' && this.quest.has('calFound') && !this.quest.has('calDone')) {
+      this.quest.set('calDone');
+      this.giveItem(makeStack('heartPiece'));
+      this.audio.play('secret');
+      this.say('TILLY', [
+        'He is alive! I knew the marsh would not keep him.',
+        'He left this in the grass behind the mill. I think it is for you, for going.',
+      ]);
+      return true;
+    }
+    return false;
   }
 
   private updateDialogue(dt: number): void {
@@ -968,7 +1081,7 @@ export class Scene {
 
   openShop(stock: string): void {
     const offers = SHOP_STOCK[stock] ?? SHOP_STOCK.general;
-    this.shop = { title: stock === 'potions' ? 'HERBALIST' : 'THE BELLOWS', offers, cursor: 0 };
+    this.shop = { title: stock === 'potions' ? 'HERBALIST' : stock === 'mill' ? 'THE MILL' : 'THE BELLOWS', offers, cursor: 0 };
     this.audio.play('select');
     this.input.flush();
   }

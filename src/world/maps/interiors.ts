@@ -60,6 +60,18 @@ const homeProps = [
   'FFFFFFFFFFFFFFFF',
 ];
 
+const millProps = [
+  'FFFFFFFFFFFFFFFF',
+  'FccccFFFFFFFFFFF',
+  'FccccFFFFFFFFFFF',
+  'FFFFFFFFFFFFFFFF',
+  'FFFFF$$$$$$FFFFF',
+  'FFFFFFFFFFFFFFFF',
+  'FFFFFFFFFFrrrrFF',
+  'FFFFFFFFFFrrrrFF',
+  'FFFFFFFFFFFFFFFF',
+];
+
 const caveProps = [
   '  uuuu    uuuu  ',
   '  uu        uu  ',
@@ -152,6 +164,21 @@ export const INTERIORS: MapDef = {
         '10,11': link('overworld', 3, 2, 17, 3, 'stairs'),
       },
       true,
+    ),
+    room(
+      2,
+      1,
+      'The Mill',
+      interior('F', millProps),
+      [
+        { kind: 'npc', x: 9, y: 4, opts: { npc: 'millerIndoors' } },
+        { kind: 'shopkeeper', x: 13, y: 4, opts: { stock: 'mill' } },
+        { kind: 'pot', x: 4, y: 8 },
+      ],
+      {
+        '9,11': link('overworld', 1, 3, 16, 6, 'door'),
+        '10,11': link('overworld', 1, 3, 16, 6, 'door'),
+      },
     ),
   ],
 };

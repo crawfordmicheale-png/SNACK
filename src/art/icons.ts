@@ -7,12 +7,12 @@ import { PAL, shade, withAlpha } from './palette';
 import { Painter, type Canvas } from './paint';
 
 export type IconName =
-  | 'sword1' | 'sword2' | 'sword3'
+  | 'sword1' | 'sword2' | 'sword3' | 'sword4'
   | 'shield1' | 'shield2'
   | 'bow' | 'arrow' | 'bomb' | 'boomerang' | 'boots' | 'lantern'
   | 'tunic' | 'ring' | 'amulet'
   | 'potion' | 'elixir' | 'ether'
-  | 'key' | 'bosskey' | 'map' | 'compass'
+  | 'key' | 'bosskey' | 'bellkey' | 'map' | 'compass'
   | 'heart' | 'heartPiece' | 'heartContainer' | 'heartEmpty'
   | 'rupee' | 'mote' | 'shard'
   | 'chestClosed' | 'chestOpen' | 'pot' | 'fairy';
@@ -46,6 +46,16 @@ const DRAWERS: Record<IconName, Drawer> = {
     p.line(1, 11, 6, 15, PAL.goldLight);
     p.rect(1, 12, 4, 4, PAL.gold);
     p.px(3, 13, PAL.magic);
+    p.px(9, 6, withAlpha(PAL.white, 0.9));
+  },
+  sword4: (p) => {
+    p.line(3, 12, 12, 2, PAL.waterLight);
+    p.line(4, 13, 13, 3, PAL.ice);
+    p.line(4, 12, 12, 3, PAL.white);
+    p.px(13, 1, PAL.white).px(12, 2, PAL.foam);
+    p.line(1, 11, 6, 15, PAL.goldLight);
+    p.rect(1, 12, 4, 4, PAL.water);
+    p.px(3, 13, PAL.foam);
     p.px(9, 6, withAlpha(PAL.white, 0.9));
   },
   shield1: (p) => {
@@ -179,6 +189,15 @@ const DRAWERS: Record<IconName, Drawer> = {
     p.line(7, 7, 13, 13, PAL.blood);
     p.line(10, 13, 12, 11, PAL.bloodLight);
     p.line(12, 15, 14, 13, PAL.bloodLight);
+    p.px(3, 3, PAL.white);
+  },
+  bellkey: (p) => {
+    p.circle(5, 5, 3.6, PAL.water);
+    p.circle(5, 5, 1.8, PAL.uiBack);
+    p.px(5, 4, PAL.foam);
+    p.line(7, 7, 13, 13, PAL.waterLight);
+    p.line(10, 13, 12, 11, PAL.ice);
+    p.line(12, 15, 14, 13, PAL.ice);
     p.px(3, 3, PAL.white);
   },
   map: (p) => {
