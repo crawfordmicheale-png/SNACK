@@ -64,14 +64,14 @@ export function drawVictory(u: UiCtx, scene: Scene, elapsed: number): void {
     rect(m, px * m.w, m.h - t * m.h, 2, 2, withAlpha(PAL.magicLight, (1 - t) * 0.5));
   }
 
-  text(m, 'THE HOLLOW SLEEPS', m.w / 2, 96, {
+  text(m, 'EPISODE ONE COMPLETE', m.w / 2, 96, {
     align: 'center',
-    size: 32,
+    size: 28,
     weight: 700,
     color: PAL.uiAccent,
-    letterSpacing: 5,
+    letterSpacing: 4,
   });
-  text(m, 'Tideheart is silent. Root and bell are both cut.', m.w / 2, 144, {
+  text(m, 'Cindermouth is ash. Root, bell, and fire are quiet — for now.', m.w / 2, 144, {
     align: 'center',
     size: 13,
     color: PAL.uiText,
@@ -98,11 +98,11 @@ export function drawVictory(u: UiCtx, scene: Scene, elapsed: number): void {
     text(m, value, boxX + boxW - 20, y, { align: 'right', size: 12, weight: 700, color: PAL.uiText });
   });
 
-  icon(m, m.art.icons.get('sword4'), m.w / 2 - 16, boxY + boxH + 18, 32);
-  text(m, 'Tidebrand is yours. The marsh will remember.', m.w / 2, boxY + boxH + 58, {
+  icon(m, m.art.icons.get('amulet'), m.w / 2 - 16, boxY + boxH + 18, 32);
+  text(m, 'To be continued. The Hollow still has west-facing secrets.', m.w / 2, boxY + boxH + 58, {
     align: 'center',
     size: 11,
-    color: PAL.magicLight,
+    color: PAL.emberLight,
   });
 
   const hint = 'PRESS  ENTER  TO KEEP EXPLORING';

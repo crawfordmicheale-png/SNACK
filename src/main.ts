@@ -91,7 +91,7 @@ function syncTouchMode(): void {
   if (touch.mode !== previous) touch.releaseAll();
   menu.touchMode = touch.enabled;
 
-  touch.showDash = scene.progression.has('dash');
+  touch.showDash = scene.progression.has('dash') || scene.inventory.has('boots');
   const quickUid = scene.inventory.quick[0];
   const quick = quickUid !== null ? scene.inventory.stackByUid(quickUid) : null;
   touch.itemIcon = quick ? itemDef(quick.defId).icon : null;

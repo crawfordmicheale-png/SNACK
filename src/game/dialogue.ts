@@ -20,7 +20,11 @@ export const QUEST_STEPS: QuestStep[] = [
   { id: 'southMarsh', title: 'Seek the drowned bell', detail: 'South of the village, past the mill, into the marsh.' },
   { id: 'enterBell', title: 'Descend the Sunken Steps', detail: 'The stair is in the sand at the marsh’s east end.' },
   { id: 'drownBoss', title: 'Silence Tideheart', detail: 'The Bell Key opens the nave. Wait for the ring.' },
-  { id: 'done', title: 'The Hollow sleeps', detail: 'Go home. Both roots are cut.' },
+  { id: 'afterBell', title: 'Speak with the elder', detail: 'Root and bell are quiet — but something still smoulders.' },
+  { id: 'seekAsh', title: 'Find the Ashen Spire', detail: 'Northwest, past the ruined approach. Look for stairs in the rubble.' },
+  { id: 'enterAsh', title: 'Climb the Ashen Spire', detail: 'Boots help. The Ash Key opens the crown.' },
+  { id: 'ashBoss', title: 'End the third hunger', detail: 'Cindermouth waits at the summit. Strike when the mouth opens.' },
+  { id: 'episodeOne', title: 'Episode One complete', detail: 'The three hungers sleep. The Hollow is not finished with you.' },
 ];
 
 export interface SideQuest {
@@ -54,6 +58,20 @@ export const SIDE_QUESTS: SideQuest[] = [
     detail: "Tilly's brother went south. Find him in the Reed Marsh.",
     askedFlag: 'calAsked',
     doneFlag: 'calDone',
+  },
+  {
+    id: 'shells',
+    title: 'Shell Stack',
+    detail: 'Bring 6 Crab Shells to Fisher Noll.',
+    askedFlag: 'shellsAsked',
+    doneFlag: 'shellsDone',
+  },
+  {
+    id: 'cinders',
+    title: 'Orchard Smoke',
+    detail: 'Bring 5 Cinder Scales to Orchard Kee.',
+    askedFlag: 'cindersAsked',
+    doneFlag: 'cindersDone',
   },
 ];
 
@@ -112,6 +130,18 @@ export const SIGNS: Record<string, string[]> = {
   sunken: ['SUNKEN STEPS', 'The bell under the marsh rang the night the root woke.', 'It has not stopped.'],
   bellEntry: ['THE DROWNED BELL', 'Fed by the Hollow Root. Older than the village.', 'Light a lantern before you go east.'],
   bellHub: ['The nave is north, behind a seal.', 'The choir is east, through the dark.', 'Something in the west wall sounds thin.'],
+  ashGate: ['ASHEN SPIRE', 'Third hunger. Stairs in the rubble.', 'The air tastes like a forge that never cooled.'],
+  ashEntry: ['THE ASHEN SPIRE', 'Root fed the bell. Bell fed the ash.', 'Boots wait east. The crown waits north.'],
+  ashHub: ['North is sealed.', 'East needs a key.', 'West remembers a blast.'],
+  ridge: ['CLOUDSCAR RIDGE', 'Ash drifts from the ruined approach.', 'The watcher stays until the smoke clears.'],
+  fishery: ['FISHERY COVE', 'Nets, stories, and shells worth trading.'],
+  orchard: ['ORCHARD RISE', 'Fruit for sale. Smoke for a favour.'],
+  salt: ['SALT FLATS', 'White and bitter. Crabs like it that way.'],
+  deepwood: ['DEEPWOOD', 'Roots remember more than the village wants them to.'],
+  southroad: ['SOUTHERN ROAD', 'Episode One ends when you choose — or when the ash does.'],
+  fogfen: ['FOG FEN', 'Shapes in the mist. Most of them are crabs.'],
+  tideshelf: ['TIDE SHELF', 'The sea keeps score. So does the bell.'],
+  wrecker: ["WRECKER'S BEACH", 'Something washed ashore. It still smoulders.'],
   default: ['The writing has weathered away.'],
 };
 
@@ -120,15 +150,19 @@ export const SIGNS: Record<string, string[]> = {
 export interface DialogueContext {
   hasBoss: boolean;
   hasTideheart: boolean;
+  hasCindermouth: boolean;
   hasBow: boolean;
   hasBossKey: boolean;
   enteredDungeon: boolean;
   enteredDrowned: boolean;
+  enteredAshen: boolean;
   level: number;
   motes: number;
   heartPieces: number;
   thornSeeds: number;
   boneShards: number;
+  crabShells: number;
+  cinderScales: number;
 }
 
 /** Returns the pages an NPC says, given where the player is in the story. */
@@ -136,11 +170,20 @@ export function npcDialogue(id: NpcId, ctx: DialogueContext, quest: QuestLog): s
   switch (id) {
     case 'elder':
     case 'elderIndoors':
+      if (ctx.hasCindermouth) {
+        return [
+          'Root. Bell. Ash. You cut all three.',
+          'Episode One ends here — but the Hollow does not. Something west of the ridge still breathes.',
+          'Rest if you need it. Explore if you do not. I will be here either way.',
+        ];
+      }
       if (ctx.hasTideheart) {
+        quest.advanceTo('seekAsh');
         return [
           'Both of them. The root and the bell.',
-          'I thought the Hollow had one hunger. It had two, and they were feeding each other.',
-          'Sleep. If anything else wakes, it will not be this year.',
+          'I thought the Hollow had two hungers. It had three, and the third has been eating the smoke of the first two.',
+          'Northwest — the Ruined Approach. Stairs in the rubble lead into the Ashen Spire.',
+          'If you climb it, do not expect a neat ending. Expect a quieter starting place for whatever comes next.',
         ];
       }
       if (ctx.hasBoss) {
@@ -208,6 +251,9 @@ export function npcDialogue(id: NpcId, ctx: DialogueContext, quest: QuestLog): s
       if (quest.has('calDone')) {
         return ['He is back! He said the marsh tried to eat his boots. I told him that is what marshes are for.'];
       }
+      if (ctx.hasCindermouth) {
+        return ['You finished Episode One? Does that mean there is an Episode Two? Can I be in it?'];
+      }
       if (ctx.hasTideheart) {
         return ['You killed the bell too? Did it splash? I wanted it to splash.'];
       }
@@ -254,8 +300,14 @@ export function npcDialogue(id: NpcId, ctx: DialogueContext, quest: QuestLog): s
 
     case 'miller':
     case 'millerIndoors':
+      if (ctx.hasCindermouth) {
+        return ['The wheel turns. The marsh is quiet. Even the ash smells thinner from here.'];
+      }
       if (ctx.hasTideheart) {
-        return ['The wheel is quieter. I had not noticed how loud the marsh was until it stopped.'];
+        return [
+          'The wheel is quieter. I had not noticed how loud the marsh was until it stopped.',
+          'If you are still looking for trouble, the ridge northwest has been coughing smoke.',
+        ];
       }
       if (ctx.hasBoss) {
         return [
@@ -281,6 +333,67 @@ export function npcDialogue(id: NpcId, ctx: DialogueContext, quest: QuestLog): s
         'You are from the village. Good. I am Cal. I am also stuck.',
         'I came for a piece of heart. I found crabs instead. They are worse.',
         'Tell Tilly I am alive. I will walk back when my legs remember how.',
+      ];
+
+    case 'fisher':
+      if (quest.has('shellsDone')) {
+        return ['Keep the shells if you find more. I am stocked. The cove is quieter when you are around.'];
+      }
+      if (ctx.crabShells >= 6 && quest.has('shellsAsked')) {
+        quest.set('shellsReady');
+        return ['Six shells. Good. Hand them over — I will trade you something that does not smell of tide.'];
+      }
+      if (!quest.has('shellsAsked')) {
+        quest.set('shellsAsked');
+        return [
+          'Noll. I pull nets. The crabs pull harder lately.',
+          'Bring me six shells and I will spare you a potion that does not taste like fish.',
+        ];
+      }
+      return [`Crab shells: you have ${ctx.crabShells}. I need six.`, 'East flats are thick with them. Watch the snap.'];
+
+    case 'orchard':
+      if (quest.has('cindersDone')) {
+        return ['The trees like the quiet. So do I. Come back when Episode Two finds a name.'];
+      }
+      if (ctx.cinderScales >= 5 && quest.has('cindersAsked')) {
+        quest.set('cindersReady');
+        return ['Five scales, still warm. That is enough for a charm that remembers fire without becoming it.'];
+      }
+      if (!quest.has('cindersAsked')) {
+        quest.set('cindersAsked');
+        return [
+          'Kee. I keep fruit and favours.',
+          'Ash creatures drop cinder scales. Bring five and I will set a ward for the climb.',
+        ];
+      }
+      return [`Cinder scales: you have ${ctx.cinderScales}. I need five.`, 'The ridge and the spire both shed them.'];
+
+    case 'watcher':
+      if (ctx.hasCindermouth) {
+        return ['The smoke thinned. I can leave the ridge now. I might not.'];
+      }
+      if (ctx.hasTideheart) {
+        return [
+          'You silenced the bell. Good. The ash did not notice.',
+          'Stairs in the Ruined Approach. Boots first if you can find them — the spire likes to shove.',
+        ];
+      }
+      return [
+        'I watch the approach. Something under those ruins still breathes heat.',
+        'If you go down, go ready. Embers hop. Ashbats spit.',
+      ];
+
+    case 'bellWatcher':
+      if (ctx.hasCindermouth) {
+        return ['Three hungers quiet. The shelf still listens. So should you.'];
+      }
+      if (ctx.hasTideheart) {
+        return ['The ring stopped. The ash did not. Northwest, if you still have legs.'];
+      }
+      return [
+        'I listen for the drowned bell. It has opinions about weather and heroes.',
+        'Sunken Steps are north of here when the tide allows.',
       ];
 
     case 'mirror':

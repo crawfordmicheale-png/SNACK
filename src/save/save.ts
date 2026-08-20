@@ -7,8 +7,8 @@ import type { ItemStack } from '../game/items/loot';
 import type { ProgressionSnapshot } from '../game/mastery';
 import type { Scene } from '../game/scene';
 
-const KEY = 'verdant-hollow-save-v2';
-const VERSION = 2;
+const KEY = 'verdant-hollow-save-v3';
+const VERSION = 3;
 
 interface WorldSave {
   tiles: number[];

@@ -264,6 +264,18 @@ export const DROP_TABLES: Record<string, DropRule[]> = {
     { kind: 'crabShell', chance: 0.4 },
     { kind: 'arrow', chance: 0.2, min: 2, max: 4 },
   ],
+  ember: [
+    { kind: 'heart', chance: 0.2 },
+    { kind: 'rupee', chance: 0.35, min: 2, max: 6 },
+    { kind: 'cinderScale', chance: 0.4 },
+    { kind: 'magic', chance: 0.2 },
+  ],
+  ashbat: [
+    { kind: 'heart', chance: 0.18 },
+    { kind: 'rupee', chance: 0.3, min: 1, max: 4 },
+    { kind: 'cinderScale', chance: 0.3 },
+    { kind: 'magic', chance: 0.25 },
+  ],
   miniboss: [
     { kind: 'heart', chance: 1 },
     { kind: 'rupee', chance: 1, min: 20, max: 30 },
@@ -280,6 +292,8 @@ export const ENEMY_LOOT_TIER: Record<string, number> = {
   thornling: 2,
   wisp: 2,
   crab: 2,
+  ember: 2,
+  ashbat: 2,
   miniboss: 4,
   boss: 5,
 };

@@ -12,7 +12,7 @@ export type IconName =
   | 'bow' | 'arrow' | 'bomb' | 'boomerang' | 'boots' | 'lantern'
   | 'tunic' | 'ring' | 'amulet'
   | 'potion' | 'elixir' | 'ether'
-  | 'key' | 'bosskey' | 'bellkey' | 'map' | 'compass'
+  | 'key' | 'bosskey' | 'bellkey' | 'ashkey' | 'map' | 'compass'
   | 'heart' | 'heartPiece' | 'heartContainer' | 'heartEmpty'
   | 'rupee' | 'mote' | 'shard'
   | 'chestClosed' | 'chestOpen' | 'pot' | 'fairy';
@@ -198,6 +198,15 @@ const DRAWERS: Record<IconName, Drawer> = {
     p.line(7, 7, 13, 13, PAL.waterLight);
     p.line(10, 13, 12, 11, PAL.ice);
     p.line(12, 15, 14, 13, PAL.ice);
+    p.px(3, 3, PAL.white);
+  },
+  ashkey: (p) => {
+    p.circle(5, 5, 3.6, PAL.ember);
+    p.circle(5, 5, 1.8, PAL.uiBack);
+    p.px(5, 4, PAL.emberLight);
+    p.line(7, 7, 13, 13, PAL.fire);
+    p.line(10, 13, 12, 11, PAL.fireLight);
+    p.line(12, 15, 14, 13, PAL.fireLight);
     p.px(3, 3, PAL.white);
   },
   map: (p) => {

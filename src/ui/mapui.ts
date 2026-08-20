@@ -85,8 +85,8 @@ function drawRoomMarkers(m: UiCtx, scene: Scene, room: RoomRuntime, x: number, y
     spawns.forEach((spawn, index) => {
       if (room.consumed.has(index)) return;
       if (spawn.kind === 'chest') markers.push('chest');
-      if (spawn.kind === 'boss' || spawn.kind === 'tideheart') markers.push('boss');
-      if (spawn.kind === 'miniboss' || spawn.kind === 'bellwight') markers.push('miniboss');
+      if (spawn.kind === 'boss' || spawn.kind === 'tideheart' || spawn.kind === 'cindermouth') markers.push('boss');
+      if (spawn.kind === 'miniboss' || spawn.kind === 'bellwight' || spawn.kind === 'emberward') markers.push('miniboss');
     });
   }
   if (room === scene.activeRoom) {

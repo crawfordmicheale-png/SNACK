@@ -264,7 +264,10 @@ export const XP_TABLE: Record<string, number> = {
   stalfos: 14,
   wisp: 11,
   crab: 10,
+  ember: 12,
+  ashbat: 11,
   miniboss: 90,
   boss: 260,
   tideheart: 320,
+  cindermouth: 400,
 };

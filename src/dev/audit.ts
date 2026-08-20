@@ -48,7 +48,19 @@ function isPassable(mapId: string, gx: number, gy: number, worlds: WorldRegistry
 }
 
 /** Spawn kinds worth asserting the player can actually walk to. */
-const IMPORTANT_SPAWNS = new Set(['chest', 'boss', 'miniboss', 'bellwight', 'tideheart', 'npc', 'shopkeeper', 'bed', 'sign']);
+const IMPORTANT_SPAWNS = new Set([
+  'chest',
+  'boss',
+  'miniboss',
+  'bellwight',
+  'tideheart',
+  'emberward',
+  'cindermouth',
+  'npc',
+  'shopkeeper',
+  'bed',
+  'sign',
+]);
 
 export function auditWorld(worlds: WorldRegistry, startMap: string, startGx: number, startGy: number): AuditReport {
   worlds.preload();

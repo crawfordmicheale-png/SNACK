@@ -10,7 +10,7 @@ import { Entity, moveWithCollision, type Gfx } from '../entity';
 import type { Scene } from '../scene';
 import { EnemyShot } from './projectiles';
 
-export type EnemyKind = 'slime' | 'octorok' | 'keese' | 'stalfos' | 'thornling' | 'wisp' | 'crab';
+export type EnemyKind = 'slime' | 'octorok' | 'keese' | 'stalfos' | 'thornling' | 'wisp' | 'crab' | 'ember' | 'ashbat';
 
 export interface EnemyStats {
   hp: number;
@@ -29,6 +29,8 @@ export const ENEMY_STATS: Record<EnemyKind, EnemyStats> = {
   stalfos: { hp: 9, touch: 2, speed: 42, armor: 1 },
   wisp: { hp: 5, touch: 1, speed: 38 },
   crab: { hp: 8, touch: 2, speed: 36, armor: 2 },
+  ember: { hp: 5, touch: 2, speed: 30 },
+  ashbat: { hp: 4, touch: 1, speed: 68 },
 };
 
 export abstract class Enemy extends Entity {
@@ -619,6 +621,119 @@ export class Crab extends Enemy {
 
 // ---------------------------------------------------------------------------
 
+/** Fire gel — hops like a slime, leaves a brief burn trail of sparks. */
+export class Ember extends Enemy {
+  private hopTimer = rng.range(0.2, 1.0);
+  private hopping = false;
+  private hopDir = { x: 0, y: 1 };
+
+  constructor(x: number, y: number) {
+    super('ember', x, y);
+    this.w = 12;
+    this.h = 9;
+  }
+
+  override update(dt: number, scene: Scene): void {
+    this.baseUpdate(dt, scene);
+    if (this.stun > 0) return;
+
+    this.hopTimer -= dt;
+    if (this.hopping) {
+      this.z = Math.max(0, Math.sin((1 - Math.max(0, this.hopTimer) / 0.4) * Math.PI) * 8);
+      moveWithCollision(this, this.hopDir.x * this.stats.speed * 2.6 * dt, this.hopDir.y * this.stats.speed * 2.6 * dt, scene);
+      if (rng.chance(dt * 8)) scene.effects.burst(this.x, this.y - 4, 2, PAL.emberLight, { speed: 40, life: 0.25 });
+      if (this.hopTimer <= 0) {
+        this.hopping = false;
+        this.z = 0;
+        this.hopTimer = rng.range(0.45, 1.0);
+        scene.effects.dust(this.x, this.y, 4);
+      }
+    } else if (this.hopTimer <= 0) {
+      const player = scene.player;
+      const dx = player.x - this.x;
+      const dy = player.y - this.y;
+      const len = Math.hypot(dx, dy) || 1;
+      this.hopDir = { x: dx / len, y: dy / len };
+      this.facing = vectorToDir(dx, dy, this.facing);
+      this.hopping = true;
+      this.hopTimer = 0.4;
+    }
+  }
+
+  override draw(g: Gfx): void {
+    this.drawAnim(g, g.art.actors.ember.idle, this.hopping ? 12 : 5);
+  }
+}
+
+// ---------------------------------------------------------------------------
+
+/** Ash-winged keese that dive harder and spit a spark on contact distance. */
+export class Ashbat extends Enemy {
+  private restTimer = rng.range(0.3, 1.2);
+  private flying = false;
+  private dirX = 0;
+  private dirY = 0;
+  private spitCooldown = 0;
+
+  constructor(x: number, y: number) {
+    super('ashbat', x, y);
+    this.w = 10;
+    this.h = 8;
+    this.z = 10;
+  }
+
+  override update(dt: number, scene: Scene): void {
+    this.baseUpdate(dt, scene);
+    if (this.stun > 0) return;
+
+    this.z = 10 + Math.sin(this.animTime * 8) * 2;
+    this.restTimer -= dt;
+    if (this.spitCooldown > 0) this.spitCooldown -= dt;
+
+    if (!this.flying) {
+      if (this.restTimer <= 0 || dist(this.x, this.y, scene.player.x, scene.player.y) < 90) {
+        this.flying = true;
+        this.restTimer = rng.range(1.0, 1.9);
+        const dx = scene.player.x - this.x;
+        const dy = scene.player.y - this.y;
+        const len = Math.hypot(dx, dy) || 1;
+        this.dirX = dx / len + rng.range(-0.4, 0.4);
+        this.dirY = dy / len + rng.range(-0.4, 0.4);
+      }
+      return;
+    }
+
+    const wobble = Math.sin(this.animTime * 12) * 0.55;
+    const res = moveWithCollision(
+      this,
+      (this.dirX + wobble * this.dirY) * this.stats.speed * dt,
+      (this.dirY - wobble * this.dirX) * this.stats.speed * dt,
+      scene,
+    );
+    if (res.hitX) this.dirX *= -1;
+    if (res.hitY) this.dirY *= -1;
+
+    if (this.spitCooldown <= 0 && dist(this.x, this.y, scene.player.x, scene.player.y) < 100) {
+      const dx = scene.player.x - this.x;
+      const dy = scene.player.y - this.y;
+      const len = Math.hypot(dx, dy) || 1;
+      scene.spawn(new EnemyShot(this.x, this.y - 10, dx / len, dy / len, 1, 'ember', 100));
+      this.spitCooldown = rng.range(1.4, 2.2);
+    }
+
+    if (this.restTimer <= 0) {
+      this.flying = false;
+      this.restTimer = rng.range(0.25, 0.8);
+    }
+  }
+
+  override draw(g: Gfx): void {
+    this.drawAnim(g, g.art.actors.ashbat.idle, this.flying ? 18 : 6);
+  }
+}
+
+// ---------------------------------------------------------------------------
+
 export function createEnemy(kind: EnemyKind, x: number, y: number): Enemy {
   switch (kind) {
     case 'slime':
@@ -635,6 +750,10 @@ export function createEnemy(kind: EnemyKind, x: number, y: number): Enemy {
       return new Wisp(x, y);
     case 'crab':
       return new Crab(x, y);
+    case 'ember':
+      return new Ember(x, y);
+    case 'ashbat':
+      return new Ashbat(x, y);
   }
 }
 
@@ -647,4 +766,6 @@ export const DEATH_COLOR: Record<EnemyKind, string> = {
   thornling: PAL.plant,
   wisp: PAL.wispLight,
   crab: PAL.crab,
+  ember: PAL.ember,
+  ashbat: PAL.ashLight,
 };

@@ -339,7 +339,7 @@ export class Player extends Entity {
   }
 
   private updateDash(dt: number, input: Input, scene: Scene): void {
-    if (!scene.progression.has('dash')) return;
+    if (!scene.progression.has('dash') && !scene.inventory.has('boots')) return;
 
     if (this.dashTimer > 0) {
       this.dashTimer -= dt;
