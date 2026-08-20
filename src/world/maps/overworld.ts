@@ -29,7 +29,7 @@ export const OVERWORLD: MapDef = {
         '#^^^^^^^^^^^^^^^^^^#',
         '#^^uuu^^^^^^^uuu^^^#',
         '#^uu.uu^^^^^uu.uu^^#',
-        '#^u...u>>^^uu...u^^#',
+        '#^u......>>uu...u^^#',
         '#^...............^^#',
         '#^.................=',
         '#^.................=',
@@ -303,7 +303,7 @@ export const OVERWORLD: MapDef = {
         { kind: 'wisp', x: 9, y: 9 },
         { kind: 'npc', x: 11, y: 7, opts: { npc: 'fisher' } },
         { kind: 'sign', x: 7, y: 10, opts: { text: 'fishery' } },
-        { kind: 'chest', x: 16, y: 9, opts: { loot: 'heartPiece' } },
+        { kind: 'chest', x: 12, y: 9, opts: { loot: 'heartPiece' } },
       ],
       links: {
         '10,5': link('interiors', 3, 0, 9, 10, 'door'),
