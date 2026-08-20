@@ -109,10 +109,10 @@ export class Arrow extends Shot {
 
 /** Enemy projectile: octorok rocks and thornling seeds. */
 export class EnemyShot extends Shot {
-  private art: 'rock' | 'seed' | 'bolt';
+  private art: 'rock' | 'seed' | 'bolt' | 'ember';
   private spin = 0;
 
-  constructor(x: number, y: number, dx: number, dy: number, damage: number, art: 'rock' | 'seed' | 'bolt', speed = 120) {
+  constructor(x: number, y: number, dx: number, dy: number, damage: number, art: 'rock' | 'seed' | 'bolt' | 'ember', speed = 120) {
     super(x, y, dx, dy, speed);
     this.damage = damage;
     this.target = 'player';
@@ -130,13 +130,13 @@ export class EnemyShot extends Shot {
     this.y += this.vy * dt;
 
     if (this.life <= 0 || this.blockedByTiles(scene)) {
-      const color = this.art === 'rock' ? PAL.rock : this.art === 'bolt' ? PAL.wispLight : PAL.plant;
+      const color =
+        this.art === 'rock' ? PAL.rock : this.art === 'bolt' ? PAL.wispLight : this.art === 'ember' ? PAL.emberLight : PAL.plant;
       scene.effects.burst(this.x, this.y - this.z, 5, color, { speed: 50, life: 0.25 });
       this.dead = true;
       return;
     }
 
-    // A raised shield facing the shot deflects it.
     const player = scene.player;
     if (!player.dead && rectsOverlap(this.hitbox(), player.hurtbox())) {
       if (player.isBlocking(this.vx, this.vy)) {
@@ -151,16 +151,18 @@ export class EnemyShot extends Shot {
   }
 
   override draw(g: Gfx): void {
-    if (this.art === 'bolt') {
+    if (this.art === 'bolt' || this.art === 'ember') {
       const x = Math.round(this.x - g.camX);
       const y = Math.round(this.y - g.camY - this.z);
+      const fill = this.art === 'ember' ? PAL.ember : PAL.wisp;
+      const core = this.art === 'ember' ? PAL.emberLight : PAL.wispLight;
       g.ctx.save();
       g.ctx.globalAlpha = 0.85;
-      g.ctx.fillStyle = PAL.wisp;
+      g.ctx.fillStyle = fill;
       g.ctx.beginPath();
       g.ctx.arc(x, y, 4, 0, Math.PI * 2);
       g.ctx.fill();
-      g.ctx.fillStyle = PAL.wispLight;
+      g.ctx.fillStyle = core;
       g.ctx.beginPath();
       g.ctx.arc(x - 1, y - 1, 2, 0, Math.PI * 2);
       g.ctx.fill();

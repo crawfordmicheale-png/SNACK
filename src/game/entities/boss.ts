@@ -4,7 +4,7 @@
  * window where they can actually be hurt.
  */
 import { PAL, withAlpha } from '../../art/palette';
-import { clamp, dist, rectsOverlap, type Rect } from '../../engine/math';
+import { clamp, dist, rectsOverlap, vectorToDir, type Rect } from '../../engine/math';
 import { rng } from '../../engine/rng';
 import { Entity, moveWithCollision, type Gfx } from '../entity';
 import type { Scene } from '../scene';
@@ -666,3 +666,296 @@ export class Tideheart extends Entity {
     return this.phase !== 'dormant';
   }
 }
+
+// ---------------------------------------------------------------------------
+
+/**
+ * Emberward: a fire-plated knight. Circles while armoured, then throws a
+ * three-ember fan and staggers open.
+ */
+export class Emberward extends Enemy {
+  private state: 'orbit' | 'wind' | 'throw' | 'open' = 'orbit';
+  private timer = 1.1;
+  private angle = rng.next() * Math.PI * 2;
+
+  constructor(x: number, y: number) {
+    super('stalfos', x, y);
+    this.w = 16;
+    this.h = 14;
+    this.maxHp = 32;
+    this.hp = this.maxHp;
+  }
+
+  protected override armorValue(): number {
+    return this.state === 'open' ? 0 : 3;
+  }
+
+  protected override damageMultiplier(): number {
+    return this.state === 'open' ? 2 : 1;
+  }
+
+  override update(dt: number, scene: Scene): void {
+    this.baseUpdate(dt, scene);
+    if (this.stun > 0) return;
+    this.timer -= dt;
+
+    const player = scene.player;
+    switch (this.state) {
+      case 'orbit': {
+        this.angle += dt * 1.6;
+        const tx = player.x + Math.cos(this.angle) * 54;
+        const ty = player.y + Math.sin(this.angle) * 40;
+        const dx = tx - this.x;
+        const dy = ty - this.y;
+        const len = Math.hypot(dx, dy) || 1;
+        moveWithCollision(this, (dx / len) * 70 * dt, (dy / len) * 70 * dt, scene);
+        this.facing = vectorToDir(player.x - this.x, player.y - this.y, this.facing);
+        if (this.timer <= 0) {
+          this.state = 'wind';
+          this.timer = 0.5;
+          scene.audio.play('charge');
+        }
+        break;
+      }
+      case 'wind':
+        if (this.timer <= 0) {
+          this.state = 'throw';
+          this.timer = 0.35;
+          const base = Math.atan2(player.y - this.y, player.x - this.x);
+          for (const spread of [-0.4, 0, 0.4]) {
+            const a = base + spread;
+            scene.spawn(new EnemyShot(this.x, this.y - 12, Math.cos(a), Math.sin(a), 2, 'ember', 120));
+          }
+          scene.audio.play('swing');
+        }
+        break;
+      case 'throw':
+        if (this.timer <= 0) {
+          this.state = 'open';
+          this.timer = 1.35;
+        }
+        break;
+      case 'open':
+        if (this.timer <= 0) {
+          this.state = 'orbit';
+          this.timer = 1.2;
+        }
+        break;
+    }
+  }
+
+  override draw(g: Gfx): void {
+    const anim = g.art.actors.stalfos.idle;
+    const frames = anim.frames[this.facing] ?? anim.frames.down;
+    const frame = frames[Math.floor(this.animTime * (this.state === 'throw' ? 12 : 5)) % frames.length];
+    this.drawShadow(g, 20);
+    const dx = Math.round(this.x - g.camX + anim.ox * 1.5);
+    const dy = Math.round(this.y - g.camY + anim.oy * 1.5);
+    g.ctx.save();
+    g.ctx.imageSmoothingEnabled = false;
+    g.ctx.drawImage(frame, dx, dy, frame.width * 1.5, frame.height * 1.5);
+    g.ctx.globalAlpha = 0.35;
+    g.ctx.fillStyle = PAL.ember;
+    g.ctx.fillRect(dx + 2, dy + 4, frame.width * 1.5 - 4, 2);
+    if (this.flash > 0) {
+      g.ctx.globalCompositeOperation = 'lighter';
+      g.ctx.globalAlpha = clamp(this.flash * 5, 0, 0.85);
+      g.ctx.drawImage(frame, dx, dy, frame.width * 1.5, frame.height * 1.5);
+    }
+    g.ctx.restore();
+    if (this.state === 'open') {
+      g.ctx.save();
+      g.ctx.globalAlpha = 0.3 + Math.sin(g.time * 12) * 0.12;
+      g.ctx.fillStyle = PAL.uiBad;
+      g.ctx.beginPath();
+      g.ctx.ellipse(this.x - g.camX, this.y - g.camY - 14, 12, 10, 0, 0, Math.PI * 2);
+      g.ctx.fill();
+      g.ctx.restore();
+    }
+  }
+
+  protected override onDeath(scene: Scene): void {
+    scene.onEmberwardKilled(this);
+  }
+}
+
+// ---------------------------------------------------------------------------
+
+type CinderPhase = 'dormant' | 'idle' | 'wind' | 'spray' | 'vulnerable' | 'summon' | 'enraged';
+
+/** Cindermouth — the ash hunger that fed on root and bell. Episode One's end. */
+export class Cindermouth extends Entity {
+  private phase: CinderPhase = 'dormant';
+  private timer = 0;
+  private cycle = 0;
+  spawnIndex = -1;
+  private introDone = false;
+  private minions: Enemy[] = [];
+
+  constructor(x: number, y: number) {
+    super();
+    this.x = x;
+    this.y = y;
+    this.team = 'enemy';
+    this.w = 34;
+    this.h = 26;
+    this.maxHp = 80;
+    this.hp = this.maxHp;
+    this.solidBody = true;
+  }
+
+  override hurtbox(): Rect {
+    if (this.phase === 'vulnerable' || this.phase === 'enraged') {
+      return { x: this.x - 16, y: this.y - 40, w: 32, h: 30 };
+    }
+    return { x: this.x - 2, y: this.y - 2, w: 1, h: 1 };
+  }
+
+  private get enraged(): boolean {
+    return this.hp <= this.maxHp * 0.4;
+  }
+
+  override takeDamage(amount: number, scene: Scene, fromX?: number, fromY?: number): boolean {
+    if (this.phase !== 'vulnerable' && this.phase !== 'enraged') {
+      scene.audio.play('block');
+      scene.effects.burst(fromX ?? this.x, (fromY ?? this.y) - 10, 6, PAL.emberLight, { speed: 70, life: 0.3 });
+      return false;
+    }
+    const landed = super.takeDamage(amount, scene, fromX, fromY, 0);
+    if (landed) {
+      this.kx = 0;
+      this.ky = 0;
+      scene.effects.addShake(3);
+      scene.effects.burst(this.x, this.y - 26, 10, PAL.fireLight, { speed: 100, life: 0.4 });
+      if (!this.dead) {
+        this.phase = 'idle';
+        this.timer = this.enraged ? 0.4 : 0.8;
+      }
+    }
+    return landed;
+  }
+
+  protected override onDeath(scene: Scene): void {
+    scene.onCindermouthKilled(this);
+  }
+
+  override update(dt: number, scene: Scene): void {
+    this.tickCommon(dt);
+    this.timer -= dt;
+    this.minions = this.minions.filter((m) => !m.dead);
+    const player = scene.player;
+
+    if (this.phase === 'dormant') {
+      if (dist(this.x, this.y, player.x, player.y) < 110) {
+        this.phase = 'idle';
+        this.timer = 1.2;
+        if (!this.introDone) {
+          this.introDone = true;
+          scene.audio.play('secret');
+          scene.effects.addShake(6);
+          scene.showBanner('CINDERMOUTH', 'Hunger of Ash');
+        }
+      }
+      return;
+    }
+
+    if (!player.dead && rectsOverlap({ x: this.x - 20, y: this.y - 34, w: 40, h: 34 }, player.hurtbox())) {
+      player.takeDamage(2, scene, this.x, this.y, 240);
+    }
+
+    switch (this.phase) {
+      case 'idle':
+        if (this.timer <= 0) {
+          this.cycle++;
+          this.phase = this.cycle % 3 === 0 ? 'summon' : 'wind';
+          this.timer = this.phase === 'summon' ? 0.7 : 0.55;
+        }
+        break;
+      case 'wind':
+        if (this.timer <= 0) {
+          this.phase = 'spray';
+          this.timer = this.enraged ? 1.5 : 1.1;
+          scene.audio.play('charge');
+        }
+        break;
+      case 'spray': {
+        if (rng.chance(dt * (this.enraged ? 20 : 12))) {
+          const a = this.animTime * 2.8 + rng.range(-0.3, 0.3);
+          scene.spawn(new EnemyShot(this.x, this.y - 22, Math.cos(a), Math.sin(a), 2, 'ember', this.enraged ? 130 : 108));
+        }
+        if (this.timer <= 0) {
+          this.phase = this.enraged ? 'enraged' : 'vulnerable';
+          this.timer = this.enraged ? 2.5 : 2.15;
+          scene.audio.play('hurt');
+        }
+        break;
+      }
+      case 'vulnerable':
+      case 'enraged':
+        if (this.phase === 'enraged' && rng.chance(dt * 5)) {
+          const a = rng.next() * Math.PI * 2;
+          scene.spawn(new EnemyShot(this.x, this.y - 22, Math.cos(a), Math.sin(a), 2, 'ember', 100));
+        }
+        if (this.timer <= 0) {
+          this.phase = 'idle';
+          this.timer = this.enraged ? 0.5 : 0.9;
+        }
+        break;
+      case 'summon': {
+        if (this.timer <= 0) {
+          if (this.minions.length < 4) {
+            for (let i = 0; i < (this.enraged ? 3 : 2); i++) {
+              const a = rng.next() * Math.PI * 2;
+              const kind = rng.chance(0.5) ? 'ember' : 'ashbat';
+              const m = createEnemy(kind, this.x + Math.cos(a) * 46, this.y + Math.sin(a) * 34);
+              this.minions.push(m);
+              scene.spawn(m);
+              scene.effects.burst(m.x, m.y - 8, 8, PAL.emberLight, { speed: 70 });
+            }
+            scene.audio.play('charge');
+          }
+          this.phase = 'idle';
+          this.timer = 1.0;
+        }
+        break;
+      }
+    }
+  }
+
+  override draw(g: Gfx): void {
+    const art = g.art.actors.cindermouth;
+    const open = this.phase === 'vulnerable' || this.phase === 'enraged' || this.phase === 'spray';
+    const set = this.flash > 0 ? art.hurt : open ? art.open : art.idle;
+    const frame = set[Math.floor(this.animTime * (this.enraged ? 8 : 4)) % set.length];
+    this.drawShadow(g, 40);
+    const shudder = this.phase === 'wind' ? Math.sin(this.animTime * 40) * 1.6 : 0;
+    const dx = Math.round(this.x - g.camX + art.ox + shudder);
+    const dy = Math.round(this.y - g.camY + art.oy);
+    g.ctx.drawImage(frame, dx, dy);
+    if (this.flash > 0) {
+      g.ctx.save();
+      g.ctx.globalCompositeOperation = 'lighter';
+      g.ctx.globalAlpha = clamp(this.flash * 5, 0, 0.8);
+      g.ctx.drawImage(frame, dx, dy);
+      g.ctx.restore();
+    }
+    if (open) {
+      g.ctx.save();
+      g.ctx.globalAlpha = 0.22 + Math.sin(g.time * 9) * 0.08;
+      g.ctx.fillStyle = withAlpha(PAL.emberLight, 1);
+      g.ctx.beginPath();
+      g.ctx.ellipse(this.x - g.camX, this.y - g.camY - 24, 16, 14, 0, 0, Math.PI * 2);
+      g.ctx.fill();
+      g.ctx.restore();
+    }
+  }
+
+  healthFraction(): number {
+    return clamp(this.hp / this.maxHp, 0, 1);
+  }
+
+  get isAwake(): boolean {
+    return this.phase !== 'dormant';
+  }
+}
+

@@ -335,6 +335,79 @@ function drawStalfos(p: Painter, dir: Dir, frame: number): void {
   else p.rect(1, 10, 4, 6, shade(PAL.bronze, 0.7));
 }
 
+function drawEmber(p: Painter, frame: number): void {
+  const squash = [0, 1, 2, 1][frame];
+  const h = 9 - squash;
+  const w = 6 + squash;
+  const y = 15 - h;
+  p.ellipse(8, y + h / 2, w, h / 2, PAL.ashDark);
+  p.ellipse(8, y + h / 2 + 0.5, w - 1.5, h / 2 - 1, PAL.ember);
+  p.ellipse(6, y + 2, 2, 1.4, PAL.emberLight);
+  p.rect(6, y + 3, 2, 2, PAL.black);
+  p.rect(10, y + 3, 2, 2, PAL.black);
+  p.px(6, y + 3, PAL.fireLight);
+  p.px(10, y + 3, PAL.fireLight);
+  // Flame tip.
+  p.px(8, y - 1, PAL.fireLight);
+  p.px(7, y, PAL.ember);
+  p.px(9, y, PAL.ember);
+}
+
+function drawAshbat(p: Painter, frame: number): void {
+  const flap = [0, 2, 3, 2][frame];
+  p.ellipse(8, 9, 3, 3.4, PAL.ashDark);
+  p.ellipse(8, 8.5, 2.2, 2.6, PAL.ash);
+  p.px(6, 8, PAL.emberLight);
+  p.px(10, 8, PAL.emberLight);
+  for (const side of [-1, 1]) {
+    const x = 8 + side * 3;
+    p.line(x, 8, x + side * 5, 8 - flap, PAL.ashDark);
+    p.line(x, 10, x + side * 5, 10 - flap + 1, PAL.ashDark);
+    p.line(x + side * 2, 9, x + side * 5, 9 - flap, PAL.ashLight);
+  }
+  p.px(7, 12, PAL.ember).px(9, 12, PAL.ember);
+}
+
+function drawCindermouth(p: Painter, frame: number, state: 'idle' | 'open' | 'hurt'): void {
+  const pulse = frame % 2;
+  const body = state === 'hurt' ? PAL.bloodDark : PAL.ashDark;
+  const bodyLight = state === 'hurt' ? PAL.blood : PAL.ash;
+
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2 + frame * 0.15;
+    const x = 24 + Math.cos(a) * 17;
+    const y = 34 + Math.sin(a) * 9;
+    p.line(24, 34, Math.round(x), Math.round(y), PAL.ashDark);
+    p.px(Math.round(x), Math.round(y), PAL.ember);
+  }
+
+  p.ellipse(24, 24, 16, 15, body);
+  p.ellipse(24, 23, 14, 13, bodyLight);
+  p.ellipse(17, 17, 5, 4, PAL.ashLight);
+
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2 + (pulse ? 0.12 : 0);
+    const px1 = 24 + Math.cos(a) * 10;
+    const py1 = 22 + Math.sin(a) * 9;
+    const px2 = 24 + Math.cos(a) * (state === 'open' ? 17 : 14);
+    const py2 = 22 + Math.sin(a) * (state === 'open' ? 15 : 12);
+    p.line(Math.round(px1), Math.round(py1), Math.round(px2), Math.round(py2), PAL.ember);
+    p.px(Math.round(px2), Math.round(py2), PAL.fireLight);
+  }
+
+  if (state === 'open' || state === 'hurt') {
+    p.ellipse(24, 22, 9, 8, PAL.ember);
+    p.ellipse(24, 22, 7, 6, PAL.fireLight);
+    p.ellipse(24, 22, 3.5, 4, PAL.pupil);
+    p.ellipse(24, 22, 2, 2.4, state === 'hurt' ? PAL.white : PAL.emberLight);
+    p.px(22, 20, PAL.white);
+  } else {
+    p.ellipse(24, 24, 8, 6, PAL.ashDark);
+    p.hline(16, 24, 16, PAL.black);
+    for (let i = 0; i < 6; i++) p.px(17 + i * 2.5, 23, PAL.emberLight);
+  }
+}
+
 function drawWisp(p: Painter, frame: number): void {
   const pulse = [0, 1, 2, 1][frame];
   const r = 3.4 + pulse * 0.5;
@@ -512,8 +585,11 @@ export interface ActorLibrary {
   thornling: ActorArt;
   wisp: ActorArt;
   crab: ActorArt;
+  ember: ActorArt;
+  ashbat: ActorArt;
   boss: { idle: Canvas[]; open: Canvas[]; hurt: Canvas[]; w: number; h: number; ox: number; oy: number };
   tideheart: { idle: Canvas[]; open: Canvas[]; hurt: Canvas[]; w: number; h: number; ox: number; oy: number };
+  cindermouth: { idle: Canvas[]; open: Canvas[]; hurt: Canvas[]; w: number; h: number; ox: number; oy: number };
 }
 
 function omniAnim(w: number, h: number, ox: number, oy: number, count: number, draw: (p: Painter, f: number) => void): AnimSet {
@@ -543,6 +619,16 @@ export function buildActorLibrary(): ActorLibrary {
     for (let f = 0; f < 2; f++) {
       const p = new Painter(BOSS_W, BOSS_H);
       drawTideheart(p, f, state);
+      list.push(p.canvas);
+    }
+    return list;
+  };
+
+  const cinderFrames = (state: 'idle' | 'open' | 'hurt') => {
+    const list: Canvas[] = [];
+    for (let f = 0; f < 2; f++) {
+      const p = new Painter(BOSS_W, BOSS_H);
+      drawCindermouth(p, f, state);
       list.push(p.canvas);
     }
     return list;
@@ -578,6 +664,14 @@ export function buildActorLibrary(): ActorLibrary {
       idle: buildAnim(16, 18, -8, -16, 2, (p, dir, f) => drawCrab(p, dir, f)),
       walk: buildAnim(16, 18, -8, -16, 2, (p, dir, f) => drawCrab(p, dir, f)),
     },
+    ember: {
+      idle: omniAnim(16, 16, -8, -14, 4, (p, f) => drawEmber(p, f)),
+      walk: omniAnim(16, 16, -8, -14, 4, (p, f) => drawEmber(p, f)),
+    },
+    ashbat: {
+      idle: omniAnim(16, 16, -8, -13, 4, (p, f) => drawAshbat(p, f)),
+      walk: omniAnim(16, 16, -8, -13, 4, (p, f) => drawAshbat(p, f)),
+    },
     boss: {
       idle: bossFrames('idle'),
       open: bossFrames('open'),
@@ -591,6 +685,15 @@ export function buildActorLibrary(): ActorLibrary {
       idle: tideFrames('idle'),
       open: tideFrames('open'),
       hurt: tideFrames('hurt'),
+      w: BOSS_W,
+      h: BOSS_H,
+      ox: -24,
+      oy: -42,
+    },
+    cindermouth: {
+      idle: cinderFrames('idle'),
+      open: cinderFrames('open'),
+      hurt: cinderFrames('hurt'),
       w: BOSS_W,
       h: BOSS_H,
       ox: -24,

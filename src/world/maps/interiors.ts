@@ -99,7 +99,7 @@ function room(
 export const INTERIORS: MapDef = {
   id: 'interiors',
   name: 'Elderbrook',
-  cols: 3,
+  cols: 4,
   rows: 2,
   music: 'village',
   rooms: [
@@ -178,6 +178,37 @@ export const INTERIORS: MapDef = {
       {
         '9,11': link('overworld', 1, 3, 16, 6, 'door'),
         '10,11': link('overworld', 1, 3, 16, 6, 'door'),
+      },
+    ),
+    room(
+      3,
+      0,
+      "Fisher's Hut",
+      interior('F', homeProps),
+      [
+        { kind: 'npc', x: 9, y: 5, opts: { npc: 'fisher' } },
+        { kind: 'pot', x: 4, y: 3 },
+        { kind: 'pot', x: 15, y: 8 },
+        { kind: 'chest', x: 14, y: 3, opts: { loot: 'arrow' } },
+      ],
+      {
+        '9,11': link('overworld', 4, 1, 10, 6, 'door'),
+        '10,11': link('overworld', 4, 1, 10, 6, 'door'),
+      },
+    ),
+    room(
+      3,
+      1,
+      'Orchard Shed',
+      interior('F', millProps),
+      [
+        { kind: 'npc', x: 9, y: 4, opts: { npc: 'orchard' } },
+        { kind: 'shopkeeper', x: 13, y: 4, opts: { stock: 'potions' } },
+        { kind: 'pot', x: 4, y: 8 },
+      ],
+      {
+        '9,11': link('overworld', 4, 2, 9, 6, 'door'),
+        '10,11': link('overworld', 4, 2, 9, 6, 'door'),
       },
     ),
   ],

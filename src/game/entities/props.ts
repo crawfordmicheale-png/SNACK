@@ -188,7 +188,11 @@ export type NpcId =
   | 'mirror'
   | 'miller'
   | 'millerIndoors'
-  | 'cal';
+  | 'cal'
+  | 'fisher'
+  | 'orchard'
+  | 'watcher'
+  | 'bellWatcher';
 
 const NPC_COLORS: Record<NpcId, { robe: string; trim: string; hair: string }> = {
   elder: { robe: '#6a5ca8', trim: '#9c8fd6', hair: PAL.white },
@@ -201,6 +205,10 @@ const NPC_COLORS: Record<NpcId, { robe: string; trim: string; hair: string }> = 
   miller: { robe: '#8a7a3a', trim: '#c4b46a', hair: '#6a4a22' },
   millerIndoors: { robe: '#8a7a3a', trim: '#c4b46a', hair: '#6a4a22' },
   cal: { robe: '#4a6a8a', trim: '#7aa0c0', hair: PAL.hairDark },
+  fisher: { robe: '#2a5a6a', trim: '#5a9ab0', hair: '#2a2a2a' },
+  orchard: { robe: '#5a7a3a', trim: '#a0c060', hair: '#8a4a22' },
+  watcher: { robe: '#5a4a3a', trim: '#c07040', hair: '#c0b0a0' },
+  bellWatcher: { robe: '#3a4a6a', trim: '#7a90b0', hair: PAL.white },
 };
 
 export class Npc extends Prop {

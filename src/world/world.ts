@@ -10,12 +10,14 @@ import type { MapDef, RoomDef } from './types';
 import { OVERWORLD } from './maps/overworld';
 import { DUNGEON } from './maps/dungeon';
 import { DROWNED } from './maps/drowned';
+import { ASHEN } from './maps/ashen';
 import { INTERIORS } from './maps/interiors';
 
 export const MAPS: Record<string, MapDef> = {
   overworld: OVERWORLD,
   dungeon: DUNGEON,
   drowned: DROWNED,
+  ashen: ASHEN,
   interiors: INTERIORS,
 };
 

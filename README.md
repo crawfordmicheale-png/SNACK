@@ -1,7 +1,7 @@
 # Verdant Hollow
 
 A browser-based top-down action RPG in the spirit of *The Legend of Zelda: A Link to
-the Past* — screen-by-screen exploration, sword-and-shield combat, two dungeons
+the Past* — screen-by-screen exploration, sword-and-shield combat, three dungeons
 with keys and bosses — wrapped around a modern inventory and a persistent mastery system.
 
 No game engine, no runtime dependencies, and no art assets: every tile, sprite,
@@ -28,7 +28,7 @@ npm run verify   # build, serve, and run the browser smoke test
 | `K` | Use the item in quick slot 1 |
 | `1`–`4` | Use quick slots |
 | `L` | Raise shield (blocks arrows, rocks and seeds you are facing) |
-| `Shift` | Dash (requires the Pegasus Dash mastery) |
+| `Shift` | Dash (requires Pegasus Dash mastery, or the Boots from the Ashen Spire) |
 | `E` | Talk, read, open chests, unlock doors |
 | `Tab` / `I` | Satchel |
 | `U` | Mastery |
@@ -60,14 +60,18 @@ quick slots along the bottom of the HUD are tap targets in their own right.
 
 ## The game
 
-**Verdant Hollow** is a 4×4 screen overworld — village, woods, a river ford,
-cliffs, barrows, a lake, a mill and a drowned marsh — leading north to
-**The Hollow Root** and south-east to **The Drowned Bell**.
+**Verdant Hollow — Episode One** is a 5×5 screen overworld — village, woods, a
+river ford, cliffs, barrows, a lake, mill, marsh, ridge, cove, orchard, and the
+southern coast — leading north to **The Hollow Root**, south-east to
+**The Drowned Bell**, and northwest into **The Ashen Spire**.
 
-Five interiors hang off the village, plus a mill cottage and a bomb cave.
-Every screen is hand-authored as an ASCII grid in
+Seven interiors hang off the village, mill, fishery and orchard, plus a bomb
+cave. Every screen is hand-authored as an ASCII grid in
 [`src/world/maps/`](src/world/maps); the legend lives in
 [`tiledefs.ts`](src/world/tiledefs.ts).
+
+The arc is open-ended: cut three hungers (root, bell, ash), then keep exploring.
+Episode One ends when Cindermouth falls; the Hollow does not.
 
 ### Combat
 
@@ -85,13 +89,18 @@ different question:
   light does nothing.
 - **Crab** keeps its shell toward you while it sidesteps, then snaps. Hit it
   after it commits.
+- **Ember** hops like a gel, but leaves a heat shimmer and shrugs off timid hits.
+- **Ashbat** roosts, then dives and spatters ember bolts.
 - **The Warden** alternates a plated advance with a telegraphed lunge, and is
   wide open for a beat after it commits.
 - **The Bellwight** vanishes and reappears in a ring of motes; cut it while it
   hangs, ringing.
+- **The Emberward** orbits in plate, then fans three embers and staggers open.
 - **Thornmaw** clamps shut except during its vulnerable phase; swinging at the
   shell only rings off it.
 - **Tideheart** is a drowned bell. Wait for the ring, then cut the clapper.
+- **Cindermouth** is the ash hunger. Wait for the mouth to open; Episode One
+  ends when it falls.
 
 ### Modern inventory
 
@@ -118,14 +127,16 @@ sequential tracks:
 | **Wayfaring** | Move speed, the dash, a loot magnet, luck, and map reveal |
 
 Heart containers also come from Pieces of Heart (four to a container) and from
-the bosses. Side favours for the herbalist, the smith and Tilly pay in ether,
-a signet ring, and another heart piece. Everything is stored in one versioned
-`localStorage` slot; the game autosaves every 25 seconds, on room rest, and on
-unload.
+the bosses. Side favours for the herbalist, the smith, Tilly, the fisher and the
+orchard keeper pay in ether, a signet ring, heart pieces and potions. Everything
+is stored in one versioned `localStorage` slot; the game autosaves every 25
+seconds, on room rest, and on unload.
 
 The Hollow Root holds two small keys, a bow, a dungeon map, a compass, the
 Warden and Thornmaw. The Drowned Bell, under the Sunken Steps, holds the
-lantern, a second map and compass, the Bellwight and Tideheart.
+lantern, a second map and compass, the Bellwight and Tideheart. The Ashen Spire,
+under the Ruined Approach, holds the boots, a third map and compass, the
+Emberward and Cindermouth — Episode One's open ending.
 
 ## Architecture
 

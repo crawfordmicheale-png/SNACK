@@ -93,6 +93,11 @@ export const PAL = {
   wispDark: '#3a4a8a',
   wisp: '#6a8ae0',
   wispLight: '#b0c8ff',
+  ashDark: '#4a3428',
+  ash: '#7a5a40',
+  ashLight: '#b08a60',
+  ember: '#f05a20',
+  emberLight: '#ffb040',
 
   // Effects
   white: '#f7f4e6',

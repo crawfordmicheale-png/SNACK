@@ -18,7 +18,7 @@ import { GameWorld, WorldRegistry, type RoomRuntime } from '../world/world';
 import { Effects } from './effects';
 import { Entity, type Gfx } from './entity';
 import { createEnemy, DEATH_COLOR, Enemy, type EnemyKind } from './entities/enemies';
-import { Thornmaw, Warden, Bellwight, Tideheart } from './entities/boss';
+import { Thornmaw, Warden, Bellwight, Tideheart, Emberward, Cindermouth } from './entities/boss';
 import { Pickup } from './entities/pickups';
 import { Boomerang, Sparkles } from './entities/projectiles';
 import { Bed, Chest, Npc, Pot, Prop, ShopCounter, SignPost, type NpcId } from './entities/props';
@@ -190,7 +190,7 @@ export class Scene {
     const room = this.world.roomForPixel(this.player.x, this.player.y);
     if (room) this.enterRoom(room, true);
     this.quest.advanceTo('start');
-    this.showBanner('VERDANT HOLLOW', 'Elderbrook Village');
+    this.showBanner('VERDANT HOLLOW', 'Episode One · Elderbrook Village');
   }
 
   markStatsDirty(): void {
@@ -271,7 +271,9 @@ export class Scene {
       case 'stalfos':
       case 'thornling':
       case 'wisp':
-      case 'crab': {
+      case 'crab':
+      case 'ember':
+      case 'ashbat': {
         if (skipEnemies) return null;
         const enemy = createEnemy(spawn.kind as EnemyKind, wx, wy);
         enemy.spawnIndex = index;
@@ -289,6 +291,12 @@ export class Scene {
         boss.spawnIndex = index;
         return boss;
       }
+      case 'cindermouth': {
+        if (room.cleared) return null;
+        const boss = new Cindermouth(wx, wy);
+        boss.spawnIndex = index;
+        return boss;
+      }
       case 'miniboss': {
         if (room.cleared) return null;
         const warden = new Warden(wx, wy);
@@ -300,6 +308,12 @@ export class Scene {
         const wight = new Bellwight(wx, wy);
         wight.spawnIndex = index;
         return wight;
+      }
+      case 'emberward': {
+        if (room.cleared) return null;
+        const ward = new Emberward(wx, wy);
+        ward.spawnIndex = index;
+        return ward;
       }
       case 'chest': {
         const chest = new Chest(wx, wy, String(opts.loot ?? 'random'), Number(opts.tier ?? 2), opts.big === true);
@@ -375,6 +389,7 @@ export class Scene {
     if (room) this.enterRoom(room, true);
     if (this.world.def.dungeon) {
       if (this.world.def.id === 'drowned') this.quest.advanceTo('enterBell');
+      else if (this.world.def.id === 'ashen') this.quest.advanceTo('enterAsh');
       else this.quest.advanceTo('enterRoot');
     }
   }
@@ -600,8 +615,9 @@ export class Scene {
         break;
 
       case 'boss': {
-        const keyId = this.world.def.id === 'drowned' ? 'bellKey' : 'bossKey';
-        const keyName = keyId === 'bellKey' ? 'Bell Key' : 'Root Key';
+        const mapId = this.world.def.id;
+        const keyId = mapId === 'drowned' ? 'bellKey' : mapId === 'ashen' ? 'ashKey' : 'bossKey';
+        const keyName = keyId === 'bellKey' ? 'Bell Key' : keyId === 'ashKey' ? 'Ash Key' : 'Root Key';
         if (this.inventory.consume(keyId, 1)) {
           this.world.setTile(gx, gy, Tile.Doorway);
           // Boss doors are two tiles wide.
@@ -614,6 +630,7 @@ export class Scene {
           this.audio.play('secret');
           this.toast(TOASTS.bossDoorOpen);
           if (keyId === 'bellKey') this.quest.advanceTo('drownBoss');
+          else if (keyId === 'ashKey') this.quest.advanceTo('ashBoss');
           else this.quest.advanceTo('boss');
         } else {
           this.audio.play('error');
@@ -755,12 +772,49 @@ export class Scene {
       this.activeRoom.consumed.add(boss.spawnIndex);
     }
     this.quest.set('tideheartDefeated');
-    this.quest.advanceTo('done');
+    this.quest.advanceTo('afterBell');
     this.progression.heartContainers++;
     this.markStatsDirty();
     this.refreshStats();
     this.player.hearts = this.player.maxHearts;
     this.dropReward(boss.x, boss.y + 8, makeStack('sword4'));
+    this.showBanner('THE BELL IS SILENT', 'Root and bell are cut. Something still smoulders.');
+    this.playSong('overworld');
+  }
+
+  onEmberwardKilled(ward: Emberward): void {
+    this.progression.kills++;
+    this.progression.addXp(XP_TABLE.miniboss);
+    this.effects.burst(ward.x, ward.y - 12, 40, PAL.emberLight, { speed: 170, life: 0.8 });
+    this.effects.addShake(7);
+    this.audio.play('secret');
+    if (this.activeRoom) {
+      this.activeRoom.cleared = true;
+      this.activeRoom.consumed.add(ward.spawnIndex);
+    }
+    this.dropReward(ward.x, ward.y, makeStack('ashKey'));
+    this.dropReward(ward.x + 20, ward.y, makeStack('amuletAsh'));
+    this.showBanner('THE EMBERWARD FALLS', 'The Ash Key is hot in the hand');
+    this.quest.advanceTo('ashBoss');
+  }
+
+  onCindermouthKilled(boss: Cindermouth): void {
+    this.progression.addXp(XP_TABLE.cindermouth);
+    this.effects.addShake(10, 2);
+    this.effects.flashScreen(PAL.emberLight, 0.9, 1.2);
+    this.effects.burst(boss.x, boss.y - 20, 60, PAL.fireLight, { speed: 200, life: 1.1 });
+    this.audio.play('secret');
+    if (this.activeRoom) {
+      this.activeRoom.cleared = true;
+      this.activeRoom.consumed.add(boss.spawnIndex);
+    }
+    this.quest.set('cindermouthDefeated');
+    this.quest.advanceTo('episodeOne');
+    this.progression.heartContainers++;
+    this.markStatsDirty();
+    this.refreshStats();
+    this.player.hearts = this.player.maxHearts;
+    this.dropReward(boss.x, boss.y + 8, makeStack('tunic3'));
     this.victory = true;
     this.playSong('overworld');
   }
@@ -791,9 +845,23 @@ export class Scene {
     const room = this.activeRoom;
     if (!room || room.cleared) return;
     const hadEnemies = (room.def.spawns ?? []).some((s) =>
-      ['slime', 'octorok', 'keese', 'stalfos', 'thornling', 'wisp', 'crab', 'boss', 'miniboss', 'bellwight', 'tideheart'].includes(
-        s.kind,
-      ),
+      [
+        'slime',
+        'octorok',
+        'keese',
+        'stalfos',
+        'thornling',
+        'wisp',
+        'crab',
+        'ember',
+        'ashbat',
+        'boss',
+        'miniboss',
+        'bellwight',
+        'tideheart',
+        'emberward',
+        'cindermouth',
+      ].includes(s.kind),
     );
     if (!hadEnemies) return;
     const alive = this.entities.some((e) => e.team === 'enemy' && !e.dead);
@@ -984,15 +1052,19 @@ export class Scene {
       {
         hasBoss: this.quest.has('bossDefeated'),
         hasTideheart: this.quest.has('tideheartDefeated'),
+        hasCindermouth: this.quest.has('cindermouthDefeated'),
         hasBow: this.inventory.has('bow'),
         hasBossKey: this.inventory.has('bossKey'),
         enteredDungeon: this.worlds.get('dungeon').rooms.get('1,2')?.visited ?? false,
         enteredDrowned: this.worlds.get('drowned').rooms.get('1,2')?.visited ?? false,
+        enteredAshen: this.worlds.get('ashen').rooms.get('1,2')?.visited ?? false,
         level: this.progression.level,
         motes: this.progression.motes,
         heartPieces: this.progression.heartPieces,
         thornSeeds: this.inventory.countOf('thornSeed'),
         boneShards: this.inventory.countOf('boneShard'),
+        crabShells: this.inventory.countOf('crabShell'),
+        cinderScales: this.inventory.countOf('cinderScale'),
       },
       this.quest,
     );
@@ -1007,6 +1079,10 @@ export class Scene {
       miller: 'MILLER OAT',
       millerIndoors: 'MILLER OAT',
       cal: 'CAL',
+      fisher: 'FISHER NOLL',
+      orchard: 'ORCHARD KEE',
+      watcher: 'RIDGE WATCHER',
+      bellWatcher: 'BELL WATCHER',
     };
     this.audio.play('menu');
     this.say(names[npcId], pages);
@@ -1043,6 +1119,28 @@ export class Scene {
       this.say('TILLY', [
         'He is alive! I knew the marsh would not keep him.',
         'He left this in the grass behind the mill. I think it is for you, for going.',
+      ]);
+      return true;
+    }
+    if (npcId === 'fisher' && this.quest.has('shellsReady') && !this.quest.has('shellsDone')) {
+      if (!this.inventory.consume('crabShell', 6)) return false;
+      this.quest.set('shellsDone');
+      this.giveItem(makeStack('potion'));
+      this.audio.play('secret');
+      this.say('FISHER NOLL', [
+        'Six shells, stacked neat. The cove owes you one.',
+        'Drink this when a crab gets the better of the argument.',
+      ]);
+      return true;
+    }
+    if (npcId === 'orchard' && this.quest.has('cindersReady') && !this.quest.has('cindersDone')) {
+      if (!this.inventory.consume('cinderScale', 5)) return false;
+      this.quest.set('cindersDone');
+      this.giveItem(makeStack('elixir'));
+      this.audio.play('secret');
+      this.say('ORCHARD KEE', [
+        'Warm scales for a cool drink. Fair trade.',
+        'The spire will still try to burn you. This only slows it down.',
       ]);
       return true;
     }
